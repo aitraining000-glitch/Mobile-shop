@@ -242,7 +242,7 @@ function zoom(src){const d=document.createElement('div');d.className='zm';d.oncl
 function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
 function menu(){
   const st=staff();
-  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart'],['Staff login','stf']];
+  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart'],['Staff login','stf']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
   o.onclick=e=>{if(e.target===o)o.remove()};
@@ -270,7 +270,7 @@ async function render(){
   const a=$('app');
   try{
     if(location.hash==='#staff'&&!S.user){a.innerHTML=loginView()}
-    else{const f={home,models,cases,cart,receipt,edit,orders,settings}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
+    else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
     a.innerHTML+='<div class="ft">'+(location.hash==='#staff'?'<a href="#">Customer view</a>':'<a href="#staff">Staff</a>')+'</div>';
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
@@ -334,6 +334,50 @@ function addCart(id){
 }
 async function chg(id,d){const c=V.rows.find(x=>x.id===id),n=Math.max(0,c.qty+d);if(n===c.qty)return;const r=await sb.from('cases').update({qty:n,updated_at:new Date().toISOString()}).eq('id',id);if(r.error)return alert(r.error.message);c.qty=n;$('q'+id).textContent=n}
 async function delCase(id){if(!(await ask('Delete this case?')))return;const r=await sb.from('cases').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)return alert(r.error.message);render()}
+/* ---------- bin (deleted cases, kept 30 days) ---------- */
+async function bin(){
+  const cut=new Date(Date.now()-30*864e5).toISOString();
+  const old=await sb.from('cases').select('id,photo_path').lt('deleted_at',cut);
+  if(old.data&&old.data.length){
+    const ph=old.data.map(x=>x.photo_path).filter(Boolean);
+    if(ph.length)await sb.storage.from('photos').remove(ph);
+    await sb.from('cases').delete().in('id',old.data.map(x=>x.id));
+  }
+  const r=await sb.from('cases').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false});
+  if(r.error)throw r.error;
+  V.bin=r.data;
+  const mn=id=>(S.models.find(m=>m.id===id)||{}).name||'';
+  const rows=r.data.map(c=>{
+    const left=Math.max(0,30-Math.floor((Date.now()-new Date(c.deleted_at).getTime())/864e5));
+    return '<div class="card row" style="align-items:flex-start">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'" alt="">':'<div class="ph none">No photo</div>')+'<div class="fl"><b>'+esc(c.name)+'</b><div class="mu">'+esc(mn(c.model_id))+' \u00B7 '+left+' days left</div><div class="row2"><button class="sb" onclick="restoreCase('+c.id+')">Restore</button><button class="sb" onclick="purgeCase('+c.id+')">Delete forever</button></div></div></div>';
+  }).join('');
+  return head('Bin')+'<div class="pad">'+(rows||'<p class="mu">Bin is empty.</p>')+'<p class="mu">Deleted cases stay here for 30 days.</p></div>';
+}
+function pickModel(def){return new Promise(res=>{
+  const bn=id=>(S.brands.find(b=>b.id===id)||{}).name||'';
+  const opts=S.models.slice().sort((a,b)=>(bn(a.brand_id)+a.name).localeCompare(bn(b.brand_id)+b.name)).map(m=>'<option value="'+m.id+'"'+(m.id===def?' selected':'')+'>'+esc(bn(m.brand_id)+' - '+m.name)+'</option>').join('');
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);border-radius:14px;padding:18px;max-width:360px;width:100%"><p style="margin:0 0 12px;font-size:17px">Restore into which model?</p><select class="in" id="pm" style="margin:0 0 12px">'+opts+'</select><div style="display:flex;gap:10px;justify-content:flex-end"><button class="sb" id="pmno">Cancel</button><button class="bt" id="pmok">Restore</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('#pmno').onclick=()=>{o.remove();res(null)};
+  o.querySelector('#pmok').onclick=()=>{const v=Number(o.querySelector('#pm').value);o.remove();res(v||null)};
+});}
+async function restoreCase(id){
+  const c=V.bin.find(x=>x.id===id);if(!c)return;
+  const m=await pickModel(c.model_id);if(!m)return;
+  const r=await sb.from('cases').update({deleted_at:null,model_id:m,updated_at:new Date().toISOString()}).eq('id',id);
+  if(r.error)return alert(r.error.message);
+  toast('Restored');render();
+}
+async function purgeCase(id){
+  const c=V.bin.find(x=>x.id===id);if(!c)return;
+  if(!(await ask('Delete "'+c.name+'" forever? This cannot be undone.')))return;
+  const r=await sb.from('cases').delete().eq('id',id);
+  if(r.error)return alert(r.error.message);
+  if(c.photo_path)sb.storage.from('photos').remove([c.photo_path]);
+  render();
+}
 /* ---------- edit case ---------- */
 async function edit(){
   let c={name:'',qty:0,price:null,offer_price:null,photo_path:null};
