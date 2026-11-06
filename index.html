@@ -242,7 +242,7 @@ function zoom(src){const d=document.createElement('div');d.className='zm';d.oncl
 function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
 function menu(){
   const st=staff();
-  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart'],['Staff login','stf']];
+  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
   o.onclick=e=>{if(e.target===o)o.remove()};
@@ -271,7 +271,7 @@ async function render(){
   try{
     if(location.hash==='#staff'&&!S.user){a.innerHTML=loginView()}
     else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
-    a.innerHTML+='<div class="ft">'+(location.hash==='#staff'?'<a href="#">Customer view</a>':'<a href="#staff">Staff</a>')+'</div>';
+    a.innerHTML+=(location.hash==='#staff'?'<div class="ft"><a href="#">Customer view</a></div>':'');
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
 }
