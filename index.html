@@ -225,8 +225,38 @@ const staff=()=>!!S.user&&location.hash==='#staff';
 function go(n,p){stack.push(V);V=Object.assign({n},p||{});render();window.scrollTo(0,0)}
 function back(){V=stack.pop()||{n:'home'};render()}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1400)}
+
+function ask(msg,withInput,def){return new Promise(res=>{
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);border-radius:14px;padding:18px;max-width:360px;width:100%"><p style="margin:0 0 12px;font-size:17px"></p>'+(withInput?'<input class="in" id="askin" style="margin:0 0 12px">':'')+'<div style="display:flex;gap:10px;justify-content:flex-end"><button class="sb" id="askno">Cancel</button><button class="bt" id="askok">OK</button></div></div>';
+  o.querySelector('p').textContent=msg;
+  document.body.appendChild(o);
+  const inp=o.querySelector('#askin');if(inp){inp.value=def||'';inp.focus()}
+  const done=v=>{o.remove();res(v)};
+  o.querySelector('#askno').onclick=()=>done(withInput?null:false);
+  o.querySelector('#askok').onclick=()=>done(withInput?inp.value:true);
+});}
+const askText=(m,d)=>ask(m,true,d);
 function zoom(src){const d=document.createElement('div');d.className='zm';d.onclick=()=>d.remove();d.innerHTML='<img src="'+esc(src)+'">';document.body.appendChild(d)}
-function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
+function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
+function menu(){
+  const st=staff();
+  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart'],['Staff login','stf']];
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
+  o.onclick=e=>{if(e.target===o)o.remove()};
+  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);width:78%;max-width:300px;height:100%;padding:16px">'+items.map(i=>'<button class="bt wide" style="margin-bottom:10px;text-align:left" data-k="'+i[0].length+i[1]+'" data-a="'+i[1]+'">'+esc(i[0])+'</button>').join('')+'</div>';
+  o.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.a;o.remove();
+    if(k==='cust'){location.hash='';if(!location.hash){stack=[];V={n:'home'};render()}return}
+    if(k==='stf'){location.hash='#staff';return}
+    if(k==='out'){logout();return}
+    stack=[];V={n:'home'};
+    if(k==='home')render();else go(k);
+  });
+  document.body.appendChild(o);
+}
 function cartBtn(){return '<button class="ib" onclick="go(\'cart\')">\uD83D\uDED2 <span id="cc">'+S.cart.reduce((a,l)=>a+l.qty,0)+'</span></button>'}
 function shrink(file,w){return new Promise((ok,no)=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const r=Math.min(1,w/img.width),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*r));c.height=Math.max(1,Math.round(img.height*r));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(new Error('Could not resize the image')),'image/jpeg',0.7)};img.onerror=()=>no(new Error('Cannot read this image'));img.src=u})}
 async function upload(file,w,prefix){const blob=await shrink(file,w);const path=prefix+'_'+Date.now()+'.jpg';const r=await sb.storage.from('photos').upload(path,blob,{contentType:'image/jpeg'});if(r.error)throw r.error;return path}
@@ -274,10 +304,10 @@ async function models(){
   return h+'</div>';
 }
 async function setLogo(f){try{const b=S.brands.find(x=>x.id===V.b);let p=null;if(f)p=await upload(f,200,'logo');const r=await sb.from('brands').update({logo_path:p}).eq('id',b.id);if(r.error)throw r.error;if(b.logo_path)sb.storage.from('photos').remove([b.logo_path]);await base();render()}catch(e){alert(e.message||e)}}
-async function delBrand(){const b=S.brands.find(x=>x.id===V.b);if(b.name==='Other')return alert('The "Other" brand cannot be deleted.');if(S.models.some(m=>m.brand_id===b.id))return alert('This brand still has models. Delete or move them first.');if(!confirm('Delete brand '+b.name+'?'))return;const r=await sb.from('brands').delete().eq('id',b.id);if(r.error)return alert(r.error.message);await base();back()}
+async function delBrand(){const b=S.brands.find(x=>x.id===V.b);if(b.name==='Other')return alert('The "Other" brand cannot be deleted.');if(S.models.some(m=>m.brand_id===b.id))return alert('This brand still has models. Delete or move them first.');if(!(await ask('Delete brand '+b.name+'?')))return;const r=await sb.from('brands').delete().eq('id',b.id);if(r.error)return alert(r.error.message);await base();back()}
 async function addModel(){const n=$('nm').value.trim();if(!n)return alert('Enter a model name');const r=await sb.from('models').insert({name:n,brand_id:V.b});if(r.error)return alert(r.error.code==='23505'?'This model already exists.':r.error.message);await base();render()}
-async function renameModel(id){const m=S.models.find(x=>x.id===id),n=prompt('Model name',m.name);if(!n||!n.trim())return;const r=await sb.from('models').update({name:n.trim()}).eq('id',id);if(r.error)return alert(r.error.code==='23505'?'This name already exists.':r.error.message);await base();render()}
-async function delModel(id){const m=S.models.find(x=>x.id===id);if(!confirm('Delete model '+m.name+'?'))return;const r=await sb.from('models').delete().eq('id',id);if(r.error)return alert('Cannot delete: it still has cases.');await base();render()}
+async function renameModel(id){const m=S.models.find(x=>x.id===id),n=await askText('Model name',m.name);if(!n||!n.trim())return;const r=await sb.from('models').update({name:n.trim()}).eq('id',id);if(r.error)return alert(r.error.code==='23505'?'This name already exists.':r.error.message);await base();render()}
+async function delModel(id){const m=S.models.find(x=>x.id===id);if(!(await ask('Delete model '+m.name+'?')))return;const r=await sb.from('models').delete().eq('id',id);if(r.error)return alert('Cannot delete: it still has cases.');await base();render()}
 /* ---------- cases ---------- */
 function priceHtml(c){const u=unit(c);if(u==null)return '';if(c.price&&c.offer_price!=null&&c.offer_price<c.price){const p=Math.round((c.price-c.offer_price)*100/c.price);return '<b>'+rs(c.offer_price)+'</b> <s class="mu">'+rs(c.price)+'</s> <span class="off">'+p+'% off</span>'}return '<b>'+rs(u)+'</b>'}
 function caseCard(c,st){
@@ -303,7 +333,7 @@ function addCart(id){
   V.sel[id]=1;$('s'+id).textContent=1;$('cc').textContent=S.cart.reduce((a,x)=>a+x.qty,0);toast('Added to cart');
 }
 async function chg(id,d){const c=V.rows.find(x=>x.id===id),n=Math.max(0,c.qty+d);if(n===c.qty)return;const r=await sb.from('cases').update({qty:n,updated_at:new Date().toISOString()}).eq('id',id);if(r.error)return alert(r.error.message);c.qty=n;$('q'+id).textContent=n}
-async function delCase(id){if(!confirm('Delete this case?'))return;const r=await sb.from('cases').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)return alert(r.error.message);render()}
+async function delCase(id){if(!(await ask('Delete this case?')))return;const r=await sb.from('cases').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)return alert(r.error.message);render()}
 /* ---------- edit case ---------- */
 async function edit(){
   let c={name:'',qty:0,price:null,offer_price:null,photo_path:null};
