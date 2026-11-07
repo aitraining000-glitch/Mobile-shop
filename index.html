@@ -223,7 +223,10 @@ const unit=c=>c.offer_price==null?c.price:c.offer_price;
 const PAL=['#0f766e','#be185d','#7c2d12','#1d4ed8','#4d7c0f','#6d28d9','#b45309','#0369a1'];
 let S={brands:[],models:[],shop:'Mobile Shop',upi:'',cart:[],user:null,busy:0,pend:0};
 let V={n:'home'},stack=[];
-const staff=()=>!!S.user&&location.hash==='#staff';
+const staff=()=>!!S.user&&(location.hash==='#staff'||location.hash==='#founder');
+const CC='id,model_id,name,qty,photo_path,price,offer_price,deleted_at,updated_at';
+const OI='id,order_id,case_id,case_name,model_name,brand_name,qty,unit_price,mrp';
+async function chkFounder(){S.founder=false;if(!S.user)return;try{const r=await sb.rpc('is_founder');S.founder=r.data===true}catch(e){}}
 function go(n,p){stack.push(V);V=Object.assign({n},p||{});render();window.scrollTo(0,0)}
 function back(){V=stack.pop()||{n:'home'};render()}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1400)}
@@ -244,7 +247,7 @@ function zoom(src){const d=document.createElement('div');d.className='zm';d.oncl
 function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
 function menu(){
   const st=staff();
-  const items=st?[['Home','home'],['Dashboard','dash'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart']];
+  const items=st?[['Home','home'],...(S.founder?[['Dashboard','dash']]:[]),['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
   o.onclick=e=>{if(e.target===o)o.remove()};
@@ -271,7 +274,7 @@ async function base(){
 async function render(){
   const a=$('app');
   try{
-    if(location.hash==='#staff'&&!S.user){a.innerHTML=loginView()}
+    if((location.hash==='#staff'||location.hash==='#founder')&&!S.user){a.innerHTML=loginView()}
     else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin,dash,hist}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
     a.innerHTML+=(location.hash==='#staff'?'<div class="ft"><a href="#">Customer view</a></div>':'');
     if(V.n==='home')renderList();
@@ -322,7 +325,7 @@ function caseCard(c,st){
 }
 async function cases(){
   const m=S.models.find(x=>x.id===V.m);if(!m){V={n:'home'};return home()}
-  const st=staff();let q=sb.from('cases').select(st?'*':'id,model_id,name,qty,photo_path,price,offer_price').eq('model_id',m.id).order('name');if(st)q=q.is('deleted_at',null);
+  const st=staff();let q=sb.from('cases').select(CC).eq('model_id',m.id).order('name');if(st)q=q.is('deleted_at',null);
   const r=await q;if(r.error)throw r.error;V.rows=r.data;V.sel=V.sel||{};
   return head(m.name,st?'<button class="ib" onclick="go(\'edit\',{m:'+m.id+'})">+ Case</button>':cartBtn())+'<div class="pad">'+(r.data.length?r.data.map(c=>caseCard(c,st)).join(''):'<p class="mu">No cases yet.</p>')+'</div>';
 }
@@ -345,7 +348,7 @@ async function bin(){
     if(ph.length)await sb.storage.from('photos').remove(ph);
     await sb.from('cases').delete().in('id',old.data.map(x=>x.id));
   }
-  const r=await sb.from('cases').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false});
+  const r=await sb.from('cases').select(CC).not('deleted_at','is',null).order('deleted_at',{ascending:false});
   if(r.error)throw r.error;
   V.bin=r.data;
   const mn=id=>(S.models.find(m=>m.id===id)||{}).name||'';
@@ -383,20 +386,21 @@ async function purgeCase(id){
 /* ---------- edit case ---------- */
 async function edit(){
   let c={name:'',qty:0,price:null,offer_price:null,photo_path:null};
-  if(V.c){const r=await sb.from('cases').select('*').eq('id',V.c).single();if(r.error)throw r.error;c=r.data}
-  V.photo=c.photo_path;V.oldPhoto=c.photo_path;
-  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" value="'+esc(c.price==null?'':c.price)+'"><label>Cost price (your buying price - only you can see this)</label><input class="in" id="ec" type="number" min="0" inputmode="numeric" value="'+esc(c.cost_price==null?'':c.cost_price)+'"><label>Offer price</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" value="'+esc(c.offer_price==null?'':c.offer_price)+'"><label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
+  if(V.c){const r=await sb.from('cases').select(CC).eq('id',V.c).single();if(r.error)throw r.error;c=r.data}
+  V.photo=c.photo_path;V.oldPhoto=c.photo_path;V.cost=null;if(V.c&&S.founder){const g=await sb.rpc('get_case_cost',{p_case_id:V.c});V.cost=g.data}
+  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" value="'+esc(c.price==null?'':c.price)+'">'+(S.founder?'<label>Cost price (your buying price - only the founder sees this)</label><input class="in" id="ec" type="number" min="0" inputmode="numeric" value="'+esc(V.cost==null?'':V.cost)+'">':'')+'<label>Offer price</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" value="'+esc(c.offer_price==null?'':c.offer_price)+'"><label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
 }
 async function pickPhoto(f){if(!f)return;try{$('pv').innerHTML='<span class="mu">Uploading...</span>';V.photo=await upload(f,800,'c');$('pv').innerHTML='<img class="ph" src="'+esc(pub(V.photo))+'">'}catch(e){$('pv').innerHTML='';alert(e.message||e)}}
 async function saveCase(){
   const name=$('en').value.trim();if(!name)return alert('Enter a case name');
   const qty=parseInt($('eq').value,10);if(!(qty>=0))return alert('Quantity must be 0 or more');
-  const num=v=>v.trim()===''?null:parseInt(v,10);const price=num($('ep').value),offer=num($('eo').value),cost=num($('ec').value);if(cost!=null&&!(cost>=0))return alert('Enter a valid cost price');
+  const num=v=>v.trim()===''?null:parseInt(v,10);const price=num($('ep').value),offer=num($('eo').value),cost=S.founder?num($('ec').value):undefined;if(cost!=null&&!(cost>=0))return alert('Enter a valid cost price');
   if((price!=null&&!(price>=0))||(offer!=null&&!(offer>=0)))return alert('Enter valid prices');
   if(price!=null&&offer!=null&&offer>price)return alert('Offer price cannot be more than the price');
-  const row={name,qty,price,offer_price:offer,cost_price:cost,photo_path:V.photo||null,updated_at:new Date().toISOString()};
-  const r=V.c?await sb.from('cases').update(row).eq('id',V.c):await sb.from('cases').insert(Object.assign({model_id:V.m},row));
+  const row={name,qty,price,offer_price:offer,photo_path:V.photo||null,updated_at:new Date().toISOString()};
+  const r=V.c?await sb.from('cases').update(row).eq('id',V.c):await sb.from('cases').insert(Object.assign({model_id:V.m},row)).select('id').single();
   if(r.error)return alert(r.error.message);
+  if(S.founder&&cost!==undefined){const cr=await sb.rpc('set_case_cost',{p_case_id:V.c||r.data.id,p_cost:cost});if(cr.error)return alert(cr.error.message)}
   if(V.oldPhoto&&V.oldPhoto!==V.photo)sb.storage.from('photos').remove([V.oldPhoto]);
   back();
 }
@@ -427,7 +431,7 @@ function receipt(){
 }
 /* ---------- staff: orders, settings, login ---------- */
 async function orders(){
-  const r=await sb.from('orders').select('*, order_items(*)').order('id',{ascending:false}).limit(60);if(r.error)throw r.error;
+  const r=await sb.from('orders').select('*, order_items('+OI+')').order('id',{ascending:false}).limit(60);if(r.error)throw r.error;
   const d=r.data.sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1));V.ol=d;
   return head('Orders')+'<div class="pad"><p class="mu">Check the payment (cash in hand, or GPay in your UPI app), then tap how the customer paid.</p>'+(d.length?d.map((o,ix)=>ordCard(o,ix,true)).join(''):'<p class="mu">No orders yet.</p>')+'</div>';
 }
@@ -449,25 +453,26 @@ function showBill(b){
 }
 /* ---------- dashboard ---------- */
 async function dash(){
-  const p=V.p||'7';
-  let q=sb.from('orders').select('id,receipt_no,total,decided_at,order_items(case_id,case_name,model_name,qty,unit_price,cost_price)').eq('status','approved').order('decided_at',{ascending:false}).limit(1000);
-  if(p!=='all'){const d=new Date();if(p==='t')d.setHours(0,0,0,0);else d.setTime(d.getTime()-Number(p)*864e5);q=q.gte('decided_at',d.toISOString())}
-  const [r,c,pen]=await Promise.all([q,sb.from('cases').select('id,name,qty,model_id,cost_price').is('deleted_at',null),sb.from('orders').select('id',{count:'exact',head:true}).eq('status','pending')]);
-  if(r.error)throw r.error;if(c.error)throw c.error;
+  if(!S.founder)return head('Dashboard')+'<div class="pad"><p class="mu">Only the founder ID can open the dashboard.</p></div>';
+  const p=V.p||'7';let since=null;
+  if(p!=='all'){const d=new Date();if(p==='t')d.setHours(0,0,0,0);else d.setTime(d.getTime()-Number(p)*864e5);since=d.toISOString()}
+  const [rp,c,pen]=await Promise.all([sb.rpc('founder_report',{p_since:since}),sb.from('cases').select('id,name,qty,model_id').is('deleted_at',null),sb.from('orders').select('id',{count:'exact',head:true}).eq('status','pending')]);
+  if(rp.error)throw rp.error;if(c.error)throw c.error;
+  const cost={};rp.data.costs.forEach(x=>{cost[x.case_id]=x.cost_price});const ord=rp.data.orders;
   let rev=0,prof=0,sold=0,noCost=0,revC=0;const by={};
-  r.data.forEach(o=>{rev+=o.total;o.order_items.forEach(i=>{sold+=i.qty;const k=i.case_id||('x'+i.case_name);const b=by[k]||(by[k]={id:i.case_id,name:i.case_name,model:i.model_name,qty:0,rev:0,prof:0});b.qty+=i.qty;b.rev+=i.unit_price*i.qty;if(i.cost_price==null)noCost+=i.qty;else{const g=(i.unit_price-i.cost_price)*i.qty;b.prof+=g;prof+=g;revC+=i.unit_price*i.qty}})});
+  ord.forEach(o=>{rev+=o.total;o.order_items.forEach(i=>{sold+=i.qty;const k=i.case_id||('x'+i.case_name);const b=by[k]||(by[k]={id:i.case_id,name:i.case_name,model:i.model_name,qty:0,rev:0,prof:0});b.qty+=i.qty;b.rev+=i.unit_price*i.qty;if(i.cost_price==null)noCost+=i.qty;else{const g=(i.unit_price-i.cost_price)*i.qty;b.prof+=g;prof+=g;revC+=i.unit_price*i.qty}})});
   const list=Object.values(by);
   const fast=list.slice().sort((a,b)=>b.qty-a.qty).slice(0,10);
   const best=list.slice().sort((a,b)=>b.prof-a.prof).slice(0,5);
   const mn=id=>(S.models.find(m=>m.id===id)||{}).name||'';
   const stuck=c.data.filter(x=>x.qty>0&&!by[x.id]).sort((a,b)=>b.qty-a.qty).slice(0,10);
   const low=c.data.filter(x=>x.qty<=2).sort((a,b)=>a.qty-b.qty).slice(0,10);
-  const stockCost=c.data.reduce((a,x)=>a+(x.cost_price==null?0:x.qty*x.cost_price),0);
+  const stockCost=c.data.reduce((a,x)=>a+(cost[x.id]==null?0:x.qty*cost[x.id]),0);
   const pb=(k,t)=>'<button class="sb'+(p===k?' on':'')+'" onclick="V.p=\''+k+'\';render()">'+t+'</button>';
   const li=a=>a.length?a.join(''):'<p class="mu">Nothing yet.</p>';
   const sc=b=>'<div class="card"><b>'+esc(b.name)+'</b><div class="mu">'+esc(b.model||'')+'</div><div>'+b.qty+' sold \u00B7 '+rs(b.rev)+' \u00B7 profit '+rs(b.prof)+'</div></div>';
   return head('Dashboard')+'<div class="pad"><div class="row2">'+pb('t','Today')+pb('7','7 days')+pb('30','30 days')+pb('all','All')+'</div>'
-   +'<div class="card"><div class="row2"><div class="fl">Sales<div class="tot">'+rs(rev)+'</div></div><div class="fl">Profit<div class="tot">'+rs(prof)+'</div></div></div><div class="mu">'+r.data.length+' bills \u00B7 '+sold+' cases sold'+(revC?' \u00B7 margin '+Math.round(prof*100/revC)+'%':'')+'</div>'+(noCost?'<div class="mu">'+noCost+' sold cases have no cost price, so their profit is not counted. Add the cost price in Edit case.</div>':'')+'</div>'
+   +'<div class="card"><div class="row2"><div class="fl">Sales<div class="tot">'+rs(rev)+'</div></div><div class="fl">Profit<div class="tot">'+rs(prof)+'</div></div></div><div class="mu">'+ord.length+' bills \u00B7 '+sold+' cases sold'+(revC?' \u00B7 margin '+Math.round(prof*100/revC)+'%':'')+'</div>'+(noCost?'<div class="mu">'+noCost+' sold cases have no cost price, so their profit is not counted. Add the cost price in Edit case.</div>':'')+'</div>'
    +(pen.count?'<div class="card" onclick="go(\'orders\')"><b>'+pen.count+' pending order(s)</b><div class="mu">Tap to open Orders</div></div>':'')
    +'<h3>Fast moving cases</h3>'+li(fast.map(sc))
    +'<h3>Most profit</h3>'+li(best.map(sc))
@@ -484,17 +489,17 @@ function histRows(d){
 }
 async function histGo(){
   const dg=($('hp').value||'').replace(/\D/g,'');if(dg.length<4)return alert('Enter at least 4 digits of the number');
-  const r=await sb.from('orders').select('*, order_items(*)').like('customer_phone','%'+dg+'%').order('id',{ascending:false}).limit(100);
+  const r=await sb.from('orders').select('*, order_items('+OI+')').like('customer_phone','%'+dg+'%').order('id',{ascending:false}).limit(100);
   if(r.error)return alert(r.error.message);
   V.hp=dg;V.ol=r.data;V.hr=histRows(r.data);$('hr').innerHTML=V.hr;
 }
 function settings(){return head('Settings')+'<div class="pad"><label>Shop name</label><input class="in" id="sn" value="'+esc(S.shop)+'"><label>Shop UPI ID</label><input class="in" id="su" value="'+esc(S.upi)+'" placeholder="name@bank"><button class="bt wide" onclick="saveSet()">Save</button><button class="bt wide alt" onclick="logout()">Sign out</button></div>'}
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
-async function logout(){await sb.auth.signOut();S.user=null;stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
-function loginView(){return head('Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
-async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;stack=[];V={n:'home'};render()}
+async function logout(){await sb.auth.signOut();S.user=null;S.founder=false;stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
+function loginView(){return head(location.hash==='#founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
+async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();stack=[];V={n:'home'};if(location.hash==='#founder'){if(S.founder)V={n:'dash'};else{alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null}}render()}
 (async()=>{
-  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;await base()}
+  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;await chkFounder();if(location.hash==='#founder'&&S.founder)V={n:'dash'};await base()}
   catch(e){$('app').innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p></div>';return}
   render();
 })();
