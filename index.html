@@ -29,6 +29,8 @@ label{font-size:14px;color:var(--mu)}
 .ft{text-align:center;margin-top:24px;font-size:13px}.ft a{color:var(--mu)}
 .zm{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:20;display:flex;align-items:center;justify-content:center}.zm img{max-width:100%;max-height:100%}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:20px;z-index:30}
+.billbox{background:#fff;color:#000;padding:4px}.bh{font-size:20px;font-weight:800;text-align:center}.btb{width:100%;border-collapse:collapse;margin:10px 0}.btb td{padding:6px 0;border-bottom:1px dashed #ccc;vertical-align:top}.r{text-align:right;white-space:nowrap}.sb.on{background:var(--pr);color:#fff}
+@media print{body *{visibility:hidden}.billbox,.billbox *{visibility:visible}.billbox{position:absolute;left:0;top:0;width:100%}.noprint{display:none!important}}
 </style></head><body>
 <div id="app"><p class="pad mu">Loading...</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.78.0/dist/umd/supabase.js"></script>
@@ -242,7 +244,7 @@ function zoom(src){const d=document.createElement('div');d.className='zm';d.oncl
 function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
 function menu(){
   const st=staff();
-  const items=st?[['Home','home'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart']];
+  const items=st?[['Home','home'],['Dashboard','dash'],['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']]:[['Home','home'],['Cart','cart']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
   o.onclick=e=>{if(e.target===o)o.remove()};
@@ -270,7 +272,7 @@ async function render(){
   const a=$('app');
   try{
     if(location.hash==='#staff'&&!S.user){a.innerHTML=loginView()}
-    else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
+    else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin,dash,hist}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
     a.innerHTML+=(location.hash==='#staff'?'<div class="ft"><a href="#">Customer view</a></div>':'');
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
@@ -320,7 +322,7 @@ function caseCard(c,st){
 }
 async function cases(){
   const m=S.models.find(x=>x.id===V.m);if(!m){V={n:'home'};return home()}
-  const st=staff();let q=sb.from('cases').select('*').eq('model_id',m.id).order('name');if(st)q=q.is('deleted_at',null);
+  const st=staff();let q=sb.from('cases').select(st?'*':'id,model_id,name,qty,photo_path,price,offer_price').eq('model_id',m.id).order('name');if(st)q=q.is('deleted_at',null);
   const r=await q;if(r.error)throw r.error;V.rows=r.data;V.sel=V.sel||{};
   return head(m.name,st?'<button class="ib" onclick="go(\'edit\',{m:'+m.id+'})">+ Case</button>':cartBtn())+'<div class="pad">'+(r.data.length?r.data.map(c=>caseCard(c,st)).join(''):'<p class="mu">No cases yet.</p>')+'</div>';
 }
@@ -383,16 +385,16 @@ async function edit(){
   let c={name:'',qty:0,price:null,offer_price:null,photo_path:null};
   if(V.c){const r=await sb.from('cases').select('*').eq('id',V.c).single();if(r.error)throw r.error;c=r.data}
   V.photo=c.photo_path;V.oldPhoto=c.photo_path;
-  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" value="'+esc(c.price==null?'':c.price)+'"><label>Offer price</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" value="'+esc(c.offer_price==null?'':c.offer_price)+'"><label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
+  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" value="'+esc(c.price==null?'':c.price)+'"><label>Cost price (your buying price - only you can see this)</label><input class="in" id="ec" type="number" min="0" inputmode="numeric" value="'+esc(c.cost_price==null?'':c.cost_price)+'"><label>Offer price</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" value="'+esc(c.offer_price==null?'':c.offer_price)+'"><label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
 }
 async function pickPhoto(f){if(!f)return;try{$('pv').innerHTML='<span class="mu">Uploading...</span>';V.photo=await upload(f,800,'c');$('pv').innerHTML='<img class="ph" src="'+esc(pub(V.photo))+'">'}catch(e){$('pv').innerHTML='';alert(e.message||e)}}
 async function saveCase(){
   const name=$('en').value.trim();if(!name)return alert('Enter a case name');
   const qty=parseInt($('eq').value,10);if(!(qty>=0))return alert('Quantity must be 0 or more');
-  const num=v=>v.trim()===''?null:parseInt(v,10);const price=num($('ep').value),offer=num($('eo').value);
+  const num=v=>v.trim()===''?null:parseInt(v,10);const price=num($('ep').value),offer=num($('eo').value),cost=num($('ec').value);if(cost!=null&&!(cost>=0))return alert('Enter a valid cost price');
   if((price!=null&&!(price>=0))||(offer!=null&&!(offer>=0)))return alert('Enter valid prices');
   if(price!=null&&offer!=null&&offer>price)return alert('Offer price cannot be more than the price');
-  const row={name,qty,price,offer_price:offer,photo_path:V.photo||null,updated_at:new Date().toISOString()};
+  const row={name,qty,price,offer_price:offer,cost_price:cost,photo_path:V.photo||null,updated_at:new Date().toISOString()};
   const r=V.c?await sb.from('cases').update(row).eq('id',V.c):await sb.from('cases').insert(Object.assign({model_id:V.m},row));
   if(r.error)return alert(r.error.message);
   if(V.oldPhoto&&V.oldPhoto!==V.photo)sb.storage.from('photos').remove([V.oldPhoto]);
@@ -402,31 +404,90 @@ async function saveCase(){
 function cart(){
   let h=head('Cart')+'<div class="pad">';if(!S.cart.length)return h+'<p class="mu">Your cart is empty.</p></div>';
   let t=0;h+=S.cart.map((l,i)=>{t+=l.unit*l.qty;return '<div class="card"><b>'+esc(l.name)+'</b><div class="mu">'+esc(l.brand)+' \u00B7 '+esc(l.model)+'</div><div class="row2"><button class="sb" onclick="cq('+i+',-1)">\u2212</button><b>'+l.qty+'</b><button class="sb" onclick="cq('+i+',1)">+</button><span class="fl"></span>'+rs(l.unit*l.qty)+'<button class="sb" onclick="cr('+i+')">Remove</button></div></div>'}).join('');
-  return h+'<div class="tot">Total: '+rs(t)+'</div><button class="bt wide" onclick="checkout(\'upi\')">Pay by UPI</button><button class="bt wide alt" onclick="checkout(\'cash\')">Pay cash at the counter</button><p class="mu">Your order is confirmed after the shop approves it.</p></div>';
+  return h+'<div class="tot">Total: '+rs(t)+'</div><label>Your name</label><input class="in" value="'+esc(S.cn||'')+'" oninput="S.cn=this.value" autocomplete="name"><label>Mobile number</label><input class="in" type="tel" inputmode="numeric" maxlength="10" value="'+esc(S.cp||'')+'" oninput="S.cp=this.value" autocomplete="tel"><button class="bt wide" onclick="checkout()">Generate bill</button><p class="mu">Pay at the counter by cash or GPay / UPI. Your order is confirmed after the shop approves it.</p></div>';
 }
 function cq(i,d){const l=S.cart[i];l.qty=Math.max(1,Math.min(l.max,l.qty+d));render()}
 function cr(i){S.cart.splice(i,1);render()}
-async function checkout(method){
-  if(S.busy)return;if(method==='upi'&&!S.upi)return alert('UPI is not set up yet. Please pay cash.');
-  S.busy=1;const r=await sb.rpc('create_order',{p_items:S.cart.map(l=>({case_id:l.id,qty:l.qty})),p_method:method});S.busy=0;
+async function checkout(){
+  if(S.busy)return;
+  const name=(S.cn||'').trim(),phone=(S.cp||'').replace(/\D/g,'');
+  if(!name)return alert('Please enter your name');
+  if(phone.length!==10)return alert('Please enter a 10 digit mobile number');
+  S.busy=1;const lines=S.cart.slice();
+  const r=await sb.rpc('create_order',{p_items:lines.map(l=>({case_id:l.id,qty:l.qty})),p_name:name,p_phone:phone});S.busy=0;
   if(r.error)return alert(r.error.message);
-  S.cart=[];stack=[];V={n:'receipt',r:r.data,method};render();
+  S.cart=[];S.cn='';S.cp='';stack=[];
+  V={n:'receipt',b:{no:r.data.receipt_no,date:new Date().toISOString(),name:name,phone:phone,total:r.data.total,pay:'',items:lines.map(l=>({name:l.name,brand:l.brand,model:l.model,qty:l.qty,unit:l.unit}))}};render();
 }
 function qrSvg(t){try{const m=makeQr(t),n=m.length,q=4;let p='';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(m[y][x])p+='M'+(x+q)+' '+(y+q)+'h1v1h-1z';return '<svg viewBox="0 0 '+(n+2*q)+' '+(n+2*q)+'" width="240" height="240" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="'+p+'" fill="#000"/></svg>'}catch(e){return '<p class="err">Could not make the QR code.</p>'}}
 function receipt(){
-  const r=V.r,up=V.method==='upi';
-  const link='upi://pay?pa='+S.upi.replace(/\s/g,'')+'&pn='+encodeURIComponent(S.shop)+'&am='+r.total+'.00&cu=INR&tn='+encodeURIComponent('Receipt '+r.receipt_no);
-  return head('Receipt')+'<div class="pad c"><div class="rno">'+esc(r.receipt_no)+'</div><div class="tot">'+rs(r.total)+'</div>'
-   +(up?'<p>Scan with any UPI app and pay '+rs(r.total)+'</p>'+qrSvg(link)+'<p><a class="bt" href="'+esc(link)+'">Open UPI app</a></p>':'<p>Show this receipt at the counter and pay cash.</p>')
-   +'<p class="mu">Take a screenshot of this receipt. Show it at the counter; the shop will approve your order, then you can collect your product.</p><button class="bt wide" onclick="stack=[];V={n:\'home\'};render()">Done</button></div>';
+  const b=V.b;
+  const link=S.upi?'upi://pay?pa='+S.upi.replace(/\s/g,'')+'&pn='+encodeURIComponent(S.shop)+'&am='+b.total+'.00&cu=INR&tn='+encodeURIComponent('Bill '+b.no):'';
+  return head('Your bill')+'<div class="pad">'+billHtml(b)+'<p class="c"><b>Pay at the counter</b> by cash or GPay / UPI.</p>'+(link?'<div class="c">'+qrSvg(link)+'<p><a class="bt" href="'+esc(link)+'">Open UPI app</a></p></div>':'')+'<p class="mu">Show this bill at the counter. After the shop confirms your payment, collect your product.</p><div class="row2"><button class="bt" onclick="window.print()">Print bill</button><button class="bt alt" onclick="stack=[];V={n:\'home\'};render()">Done</button></div></div>';
 }
 /* ---------- staff: orders, settings, login ---------- */
 async function orders(){
   const r=await sb.from('orders').select('*, order_items(*)').order('id',{ascending:false}).limit(60);if(r.error)throw r.error;
-  const d=r.data.sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1));
-  return head('Orders')+'<div class="pad"><p class="mu">For UPI orders, check your UPI app for the payment before approving.</p>'+(d.length?d.map(o=>'<div class="card"><div class="row2" style="margin:0"><b>'+esc(o.receipt_no)+'</b> \u00B7 '+(o.method==='upi'?'UPI':'Cash')+' \u00B7 '+rs(o.total)+'<span class="fl"></span><span class="tag '+esc(o.status)+'">'+esc(o.status)+'</span></div><div class="mu">'+esc(new Date(o.created_at).toLocaleString())+'</div>'+o.order_items.map(i=>'<div>'+i.qty+' \u00D7 '+esc(i.brand_name||'')+' '+esc(i.model_name||'')+' \u2013 '+esc(i.case_name)+' ('+rs(i.unit_price)+')</div>').join('')+(o.status==='pending'?'<div class="row2"><button class="bt" onclick="decide('+o.id+',\'approve_order\')">Approve</button><button class="bt bad2" onclick="decide('+o.id+',\'reject_order\')">Reject</button></div>':'')+'</div>').join(''):'<p class="mu">No orders yet.</p>')+'</div>';
+  const d=r.data.sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1));V.ol=d;
+  return head('Orders')+'<div class="pad"><p class="mu">Check the payment (cash in hand, or GPay in your UPI app), then tap how the customer paid.</p>'+(d.length?d.map((o,ix)=>ordCard(o,ix,true)).join(''):'<p class="mu">No orders yet.</p>')+'</div>';
 }
-async function decide(id,fn){if(S.busy)return;S.busy=1;const r=await sb.rpc(fn,{p_order_id:id});S.busy=0;if(r.error)alert(r.error.message);render()}
+function ordCard(o,ix,act){
+  return '<div class="card"><div class="row2" style="margin:0"><b>'+esc(o.receipt_no)+'</b> \u00B7 '+rs(o.total)+'<span class="fl"></span><span class="tag '+esc(o.status)+'">'+esc(o.status)+'</span></div><div>'+esc(o.customer_name||'(no name)')+(o.customer_phone?' \u00B7 '+esc(o.customer_phone):'')+'</div><div class="mu">'+esc(new Date(o.created_at).toLocaleString())+(o.status==='approved'?' \u00B7 '+payName(o.method):'')+'</div>'+o.order_items.map(i=>'<div>'+i.qty+' \u00D7 '+esc(i.brand_name||'')+' '+esc(i.model_name||'')+' \u2013 '+esc(i.case_name)+' ('+rs(i.unit_price)+')</div>').join('')+'<div class="row2">'+(act&&o.status==='pending'?'<button class="bt" onclick="decide('+o.id+',\'approve_order\',\'cash\')">Approve \u2013 Cash</button><button class="bt" onclick="decide('+o.id+',\'approve_order\',\'upi\')">Approve \u2013 GPay</button><button class="bt bad2" onclick="decide('+o.id+',\'reject_order\')">Reject</button>':'')+'<button class="bt alt" onclick="showBill(billOf(V.ol['+ix+']))">Bill</button></div></div>';
+}
+async function decide(id,fn,method){if(S.busy)return;S.busy=1;const a={p_order_id:id};if(method)a.p_method=method;const r=await sb.rpc(fn,a);S.busy=0;if(r.error)alert(r.error.message);render()}
+/* ---------- bill ---------- */
+function billHtml(b){
+  const rows=b.items.map(i=>'<tr><td>'+esc(i.name)+'<div class="mu">'+esc((i.brand||'')+' '+(i.model||''))+'</div></td><td class="r">'+i.qty+' \u00D7 '+rs(i.unit)+'</td><td class="r">'+rs(i.qty*i.unit)+'</td></tr>').join('');
+  return '<div class="billbox"><div class="bh">'+esc(S.shop)+'</div><div class="mu">Bill '+esc(b.no)+' \u00B7 '+esc(new Date(b.date).toLocaleString())+'</div><div>'+esc(b.name||'')+(b.phone?' \u00B7 '+esc(b.phone):'')+'</div><table class="btb">'+rows+'</table><div class="tot">Total '+rs(b.total)+'</div>'+(b.pay?'<div>Paid by '+esc(b.pay)+'</div>':'')+'<div class="mu">Thank you!</div></div>';
+}
+function payName(m){return m==='upi'?'GPay / UPI':m==='cash'?'Cash':'Not paid yet'}
+function billOf(o){return {no:o.receipt_no,date:o.decided_at||o.created_at,name:o.customer_name,phone:o.customer_phone,total:o.total,pay:o.status==='approved'?payName(o.method):'',items:(o.order_items||[]).map(i=>({name:i.case_name,brand:i.brand_name,model:i.model_name,qty:i.qty,unit:i.unit_price}))}}
+function showBill(b){
+  const o=document.createElement('div');o.id='billov';o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999;overflow:auto;padding:16px';
+  o.innerHTML='<div style="background:#fff;color:#000;border-radius:12px;padding:16px;max-width:380px;margin:0 auto">'+billHtml(b)+'<div class="row2 noprint"><button class="bt" onclick="window.print()">Print</button><button class="bt alt" onclick="document.getElementById(\'billov\').remove()">Close</button></div></div>';
+  document.body.appendChild(o);
+}
+/* ---------- dashboard ---------- */
+async function dash(){
+  const p=V.p||'7';
+  let q=sb.from('orders').select('id,receipt_no,total,decided_at,order_items(case_id,case_name,model_name,qty,unit_price,cost_price)').eq('status','approved').order('decided_at',{ascending:false}).limit(1000);
+  if(p!=='all'){const d=new Date();if(p==='t')d.setHours(0,0,0,0);else d.setTime(d.getTime()-Number(p)*864e5);q=q.gte('decided_at',d.toISOString())}
+  const [r,c,pen]=await Promise.all([q,sb.from('cases').select('id,name,qty,model_id,cost_price').is('deleted_at',null),sb.from('orders').select('id',{count:'exact',head:true}).eq('status','pending')]);
+  if(r.error)throw r.error;if(c.error)throw c.error;
+  let rev=0,prof=0,sold=0,noCost=0,revC=0;const by={};
+  r.data.forEach(o=>{rev+=o.total;o.order_items.forEach(i=>{sold+=i.qty;const k=i.case_id||('x'+i.case_name);const b=by[k]||(by[k]={id:i.case_id,name:i.case_name,model:i.model_name,qty:0,rev:0,prof:0});b.qty+=i.qty;b.rev+=i.unit_price*i.qty;if(i.cost_price==null)noCost+=i.qty;else{const g=(i.unit_price-i.cost_price)*i.qty;b.prof+=g;prof+=g;revC+=i.unit_price*i.qty}})});
+  const list=Object.values(by);
+  const fast=list.slice().sort((a,b)=>b.qty-a.qty).slice(0,10);
+  const best=list.slice().sort((a,b)=>b.prof-a.prof).slice(0,5);
+  const mn=id=>(S.models.find(m=>m.id===id)||{}).name||'';
+  const stuck=c.data.filter(x=>x.qty>0&&!by[x.id]).sort((a,b)=>b.qty-a.qty).slice(0,10);
+  const low=c.data.filter(x=>x.qty<=2).sort((a,b)=>a.qty-b.qty).slice(0,10);
+  const stockCost=c.data.reduce((a,x)=>a+(x.cost_price==null?0:x.qty*x.cost_price),0);
+  const pb=(k,t)=>'<button class="sb'+(p===k?' on':'')+'" onclick="V.p=\''+k+'\';render()">'+t+'</button>';
+  const li=a=>a.length?a.join(''):'<p class="mu">Nothing yet.</p>';
+  const sc=b=>'<div class="card"><b>'+esc(b.name)+'</b><div class="mu">'+esc(b.model||'')+'</div><div>'+b.qty+' sold \u00B7 '+rs(b.rev)+' \u00B7 profit '+rs(b.prof)+'</div></div>';
+  return head('Dashboard')+'<div class="pad"><div class="row2">'+pb('t','Today')+pb('7','7 days')+pb('30','30 days')+pb('all','All')+'</div>'
+   +'<div class="card"><div class="row2"><div class="fl">Sales<div class="tot">'+rs(rev)+'</div></div><div class="fl">Profit<div class="tot">'+rs(prof)+'</div></div></div><div class="mu">'+r.data.length+' bills \u00B7 '+sold+' cases sold'+(revC?' \u00B7 margin '+Math.round(prof*100/revC)+'%':'')+'</div>'+(noCost?'<div class="mu">'+noCost+' sold cases have no cost price, so their profit is not counted. Add the cost price in Edit case.</div>':'')+'</div>'
+   +(pen.count?'<div class="card" onclick="go(\'orders\')"><b>'+pen.count+' pending order(s)</b><div class="mu">Tap to open Orders</div></div>':'')
+   +'<h3>Fast moving cases</h3>'+li(fast.map(sc))
+   +'<h3>Most profit</h3>'+li(best.map(sc))
+   +'<h3>In stock but not selling</h3>'+li(stuck.map(x=>'<div class="card"><b>'+esc(x.name)+'</b><div class="mu">'+esc(mn(x.model_id))+' \u00B7 '+x.qty+' in stock</div></div>'))
+   +'<h3>Reorder soon (2 or less)</h3>'+li(low.map(x=>'<div class="card"><b>'+esc(x.name)+'</b><div class="mu">'+esc(mn(x.model_id))+' \u00B7 '+(x.qty?x.qty+' left':'Out of stock')+'</div></div>'))
+   +'<div class="card mu">Stock value at cost price: '+rs(stockCost)+'</div></div>';
+}
+/* ---------- customer history ---------- */
+function hist(){return head('Customer history')+'<div class="pad"><label>Customer mobile number</label><input class="in" id="hp" type="tel" inputmode="numeric" placeholder="10 digit number" value="'+esc(V.hp||'')+'"><button class="bt wide" onclick="histGo()">Search</button><div id="hr">'+(V.hr||'')+'</div></div>'}
+function histRows(d){
+  if(!d.length)return '<p class="mu">No purchases found for this number.</p>';
+  const ok=d.filter(o=>o.status==='approved'),tot=ok.reduce((a,o)=>a+o.total,0);
+  return '<div class="card"><b>'+esc(d[0].customer_name||'')+'</b> \u00B7 '+ok.length+' purchase(s) \u00B7 '+rs(tot)+' total</div>'+d.map((o,ix)=>ordCard(o,ix,false)).join('');
+}
+async function histGo(){
+  const dg=($('hp').value||'').replace(/\D/g,'');if(dg.length<4)return alert('Enter at least 4 digits of the number');
+  const r=await sb.from('orders').select('*, order_items(*)').like('customer_phone','%'+dg+'%').order('id',{ascending:false}).limit(100);
+  if(r.error)return alert(r.error.message);
+  V.hp=dg;V.ol=r.data;V.hr=histRows(r.data);$('hr').innerHTML=V.hr;
+}
 function settings(){return head('Settings')+'<div class="pad"><label>Shop name</label><input class="in" id="sn" value="'+esc(S.shop)+'"><label>Shop UPI ID</label><input class="in" id="su" value="'+esc(S.upi)+'" placeholder="name@bank"><button class="bt wide" onclick="saveSet()">Save</button><button class="bt wide alt" onclick="logout()">Sign out</button></div>'}
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
 async function logout(){await sb.auth.signOut();S.user=null;stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
