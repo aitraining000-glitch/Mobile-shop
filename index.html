@@ -238,10 +238,11 @@ const unit=c=>c.offer_price==null?c.price:c.offer_price;
 const PAL=['#0f766e','#be185d','#7c2d12','#1d4ed8','#4d7c0f','#6d28d9','#b45309','#0369a1'];
 let S={brands:[],models:[],shop:'Mobile Shop',upi:'',cart:[],user:null,busy:0,pend:0};
 let V={n:'home'},stack=[];
-const staff=()=>!!S.user&&(location.hash==='#staff'||location.hash==='#founder');
+const MODE=()=>{const p=location.pathname.replace(/\/+$/,'').toLowerCase(),h=location.hash;return (p.slice(-8)==='/founder'||h==='#founder')?'founder':(p.slice(-6)==='/staff'||h==='#staff')?'staff':''};
+const staff=()=>!!S.user&&MODE()!=='';
 const CC='id,model_id,name,qty,photo_path,price,offer_price,deleted_at,updated_at';
 const OI='id,order_id,case_id,case_name,model_name,brand_name,qty,unit_price,mrp';
-const fnd=()=>!!S.founder&&location.hash==='#founder';
+const fnd=()=>!!S.founder&&MODE()==='founder';
 async function chkFounder(){S.founder=false;if(!S.user)return;try{const r=await sb.rpc('is_founder');S.founder=r.data===true}catch(e){}}
 function go(n,p){stack.push(V);V=Object.assign({n},p||{});render();window.scrollTo(0,0)}
 function back(){V=stack.pop()||{n:'home'};render()}
@@ -279,7 +280,7 @@ function menu(){
   o.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     const k=b.dataset.a;o.remove();
     if(k.indexOf('dt:')===0){const t=k.slice(3);if(V.n==='dash')V.tab=t;else{stack=[];V={n:'dash',tab:t}}render();window.scrollTo(0,0);return}
-    if(k==='cust'){location.hash='';if(!location.hash){S.billing=false;stack=[];V={n:'home'};render()}return}
+    if(k==='cust'){S.billing=false;location.href='/';return}
     if(k==='out'){S.billing=false;logout();return}
     if(k==='bill'){S.billing=true;stack=[];V={n:'home'};render();return}
     S.billing=false;stack=[];V={n:'home'};
@@ -299,9 +300,9 @@ async function base(){
 async function render(){
   const a=$('app');
   try{
-    if((location.hash==='#staff'||location.hash==='#founder')&&!S.user){a.innerHTML=loginView()}
+    if(MODE()!==''&&!S.user){a.innerHTML=loginView()}
     else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin,dash,hist}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
-    a.innerHTML+=(location.hash==='#founder'?'<div class="ft"><a href="#">Customer view</a></div>':'');
+    a.innerHTML+=(MODE()==='founder'?'<div class="ft"><a href="/">Customer view</a></div>':'');
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
 }
@@ -659,10 +660,10 @@ async function histGo(){
 function settings(){return head('Settings')+'<div class="pad"><label>Shop name</label><input class="in" id="sn" value="'+esc(S.shop)+'"><label>Shop UPI ID</label><input class="in" id="su" value="'+esc(S.upi)+'" placeholder="name@bank"><button class="bt wide" onclick="saveSet()">Save</button><button class="bt wide alt" onclick="logout()">Sign out</button></div>'}
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
 async function logout(){await sb.auth.signOut();S.user=null;S.founder=false;stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
-function loginView(){return head(location.hash==='#founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
-async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();stack=[];V={n:'home'};if(location.hash==='#founder'){if(S.founder)V={n:'dash'};else{alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null}}render()}
+function loginView(){return head(MODE()==='founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
+async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();stack=[];V={n:'home'};if(MODE()==='founder'){if(S.founder)V={n:'dash'};else{alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null}}render()}
 (async()=>{
-  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;await chkFounder();if(location.hash==='#founder'&&S.founder)V={n:'dash'};await base()}
+  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;await chkFounder();if(MODE()==='founder'&&S.founder)V={n:'dash'};await base()}
   catch(e){$('app').innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p></div>';return}
   render();
 })();
