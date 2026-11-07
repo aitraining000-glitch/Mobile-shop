@@ -31,6 +31,21 @@ label{font-size:14px;color:var(--mu)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:20px;z-index:30}
 .billbox{background:#fff;color:#000;padding:4px}.bh{font-size:20px;font-weight:800;text-align:center}.btb{width:100%;border-collapse:collapse;margin:10px 0}.btb td{padding:6px 0;border-bottom:1px dashed #ccc;vertical-align:top}.r{text-align:right;white-space:nowrap}.sb.on{background:var(--pr);color:#fff}
 @media print{body *{visibility:hidden}.billbox,.billbox *{visibility:visible}.billbox{position:absolute;left:0;top:0;width:100%}.noprint{display:none!important}}
+.dbw{--dbg:#0b0716;--dcd:#16102b;--dtx:#f3eefc;--dmu:#9b8fbf;--dac:#a855f7;--dac2:#ec4899;--dbd:#2a2150;background:var(--dbg);color:var(--dtx);min-height:100vh}
+.dbw.th2{--dbg:#f4f6fb;--dcd:#fff;--dtx:#111827;--dmu:#6b7280;--dac:#2563eb;--dac2:#16a34a;--dbd:#e5e7eb}
+.dbw.th3{--dbg:#07130f;--dcd:#0f221b;--dtx:#e8fff6;--dmu:#84b5a2;--dac:#10b981;--dac2:#f59e0b;--dbd:#1b3a2e}
+.dbw .hd{background:var(--dbg);color:var(--dtx);border-color:var(--dbd)}.dbw .ib{background:var(--dcd);color:var(--dtx);border:1px solid var(--dbd)}
+.dpad{padding:12px}.dbx{background:var(--dcd);border:1px solid var(--dbd);border-radius:16px;padding:14px;margin-bottom:12px}
+.dbt{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.dmu,.dbw small{color:var(--dmu);font-size:12px}.dbw small{display:block}
+.dks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.dk{background:var(--dcd);border:1px solid var(--dbd);border-radius:14px;padding:12px}.dv{font-size:22px;font-weight:800;color:var(--dac)}
+.dchs{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px}.dch{border:1px solid var(--dbd);background:var(--dcd);color:var(--dtx);border-radius:999px;padding:7px 12px;white-space:nowrap;font:inherit}.dch.on{background:var(--dac);color:#fff;border-color:var(--dac)}
+.dr{display:flex;gap:6px;margin-bottom:10px}.dr input{flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid var(--dbd);background:var(--dcd);color:var(--dtx)}
+.drw{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--dbd)}.drw:last-child{border:0}
+.tgl{display:inline-flex;gap:4px}.tgl button{border:1px solid var(--dbd);background:transparent;color:var(--dmu);border-radius:8px;padding:4px 9px;font:inherit;font-size:12px}.tgl button.on{background:var(--dac);color:#fff;border-color:var(--dac)}
+.dn{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.lgd div{margin:4px 0;font-size:13px}.lgd i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.bh2{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.bh2 span{width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bh2 div{flex:1;background:var(--dbd);border-radius:6px;height:10px}.bh2 u{display:block;height:10px;border-radius:6px}
+.cols{display:flex;align-items:flex-end;gap:2px;height:110px}.col{flex:1;display:flex;align-items:flex-end;height:100%}.col u{display:block;width:100%;background:var(--dac);border-radius:3px 3px 0 0;min-height:1px}
+.dthm{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 </style></head><body>
 <div id="app"><p class="pad mu">Loading...</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.78.0/dist/umd/supabase.js"></script>
@@ -245,20 +260,29 @@ function ask(msg,withInput,def){return new Promise(res=>{
 });}
 const askText=(m,d)=>ask(m,true,d);
 function zoom(src){const d=document.createElement('div');d.className='zm';d.onclick=()=>d.remove();d.innerHTML='<img src="'+esc(src)+'">';document.body.appendChild(d)}
-function head(title,right){return '<div class="hd">'+(V.n!=='home'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(right||'')+'</div>'}
+function head(title,right){return '<div class="hd">'+(V.n!=='home'&&V.n!=='dash'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(S.billing&&staff()?'<span class="tag approved">BILLING</span>':'')+(right||'')+'</div>'}
 function menu(){
-  const st=staff();
-  const items=st?[['Home','home'],...(fnd()?[['Dashboard','dash']]:[]),['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings'],...(fnd()?[['Customer view','cust']]:[]),['Sign out','out']]:[['Home','home'],['Cart','cart']];
+  const st=staff();let items;
+  if(st){
+    items=[];
+    if(fnd()&&V.n==='dash')items.push(['Overview','dt:ov'],['Sales','dt:sales'],['Products','dt:prod'],['Staff','dt:staff'],['Stock','dt:stock'],['-','-']);
+    items.push(['Stock and Home','home'],['New Bill','bill']);
+    if(fnd())items.push(['Dashboard','dash']);
+    items.push(['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings']);
+    if(fnd())items.push(['Customer view','cust']);
+    items.push(['Sign out','out']);
+  }else items=[['Home','home'],['Cart','cart']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
   o.onclick=e=>{if(e.target===o)o.remove()};
-  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);width:78%;max-width:300px;height:100%;padding:16px">'+items.map(i=>'<button class="bt wide" style="margin-bottom:10px;text-align:left" data-k="'+i[0].length+i[1]+'" data-a="'+i[1]+'">'+esc(i[0])+'</button>').join('')+'</div>';
+  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);width:78%;max-width:300px;height:100%;padding:16px;overflow:auto">'+items.map(i=>i[1]==='-'?'<hr>':'<button class="bt wide" style="margin-bottom:10px;text-align:left" data-a="'+i[1]+'">'+esc(i[0])+'</button>').join('')+'</div>';
   o.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     const k=b.dataset.a;o.remove();
-    if(k==='cust'){location.hash='';if(!location.hash){stack=[];V={n:'home'};render()}return}
-    if(k==='stf'){location.hash='#staff';return}
-    if(k==='out'){logout();return}
-    stack=[];V={n:'home'};
+    if(k.indexOf('dt:')===0){const t=k.slice(3);if(V.n==='dash')V.tab=t;else{stack=[];V={n:'dash',tab:t}}render();window.scrollTo(0,0);return}
+    if(k==='cust'){location.hash='';if(!location.hash){S.billing=false;stack=[];V={n:'home'};render()}return}
+    if(k==='out'){S.billing=false;logout();return}
+    if(k==='bill'){S.billing=true;stack=[];V={n:'home'};render();return}
+    S.billing=false;stack=[];V={n:'home'};
     if(k==='home')render();else go(k);
   });
   document.body.appendChild(o);
@@ -286,7 +310,7 @@ window.addEventListener('hashchange',()=>{stack=[];V={n:'home'};render()});
 async function home(){
   const st=staff();
   if(st){const r=await sb.from('orders').select('id',{count:'exact',head:true}).eq('status','pending');S.pend=r.count||0}
-  const right=st?'<button class="ib" onclick="go(\'orders\')">Orders'+(S.pend?' ('+S.pend+')':'')+'</button><button class="ib" onclick="go(\'settings\')">\u2699</button>':cartBtn();
+  const right=st&&!S.billing?'<button class="ib" onclick="go(\'orders\')">Orders'+(S.pend?' ('+S.pend+')':'')+'</button><button class="ib" onclick="go(\'settings\')">\u2699</button>':cartBtn();
   return head(S.shop,right)+'<div class="pad"><input class="in" placeholder="Search brand or model..." value="'+esc(V.q||'')+'" oninput="V.q=this.value;renderList()"><div id="list"></div></div>';
 }
 function renderList(){
@@ -296,13 +320,13 @@ function renderList(){
     el.innerHTML=r.length?r.map(m=>'<div class="card" onclick="go(\'cases\',{m:'+m.id+'})"><b>'+esc(m.name)+'</b><div class="mu">'+esc(bn(m.brand_id))+'</div></div>').join(''):'<p class="mu">Nothing found.</p>';return}
   el.innerHTML='<div class="grid">'+S.brands.map(b=>{const n=S.models.filter(m=>m.brand_id===b.id).length;
     return '<div class="tile" style="background:'+esc(b.color||'#6b7280')+'" onclick="go(\'models\',{b:'+b.id+'})">'+(b.logo_path?'<span class="lg"><img src="'+esc(pub(b.logo_path))+'" alt=""></span>':'<span class="lt">'+esc((b.name[0]||'?').toUpperCase())+'</span>')+'<div><b>'+esc(b.name)+'</b><div class="sm">'+n+' models</div></div></div>'}).join('')+'</div>'
-    +(staff()?'<div class="row" style="margin-top:14px"><input class="in" id="nb" placeholder="New brand" style="margin:0"><button class="bt" onclick="addBrand()">+ Brand</button></div>':'');
+    +(staff()&&!S.billing?'<div class="row" style="margin-top:14px"><input class="in" id="nb" placeholder="New brand" style="margin:0"><button class="bt" onclick="addBrand()">+ Brand</button></div>':'');
 }
 async function addBrand(){const n=$('nb').value.trim();if(!n)return alert('Enter a brand name');const r=await sb.from('brands').insert({name:n,color:PAL[S.brands.length%PAL.length]});if(r.error)return alert(r.error.code==='23505'?'This brand already exists.':r.error.message);await base();render()}
 /* ---------- models ---------- */
 async function models(){
   const b=S.brands.find(x=>x.id===V.b);if(!b){V={n:'home'};return home()}
-  const st=staff(),list=S.models.filter(m=>m.brand_id===b.id);
+  const st=staff()&&!S.billing,list=S.models.filter(m=>m.brand_id===b.id);
   let h=head(b.name,st?'':cartBtn())+'<div class="pad">';
   if(st)h+='<div class="row2"><label class="sb">Change logo<input type="file" accept="image/*" hidden onchange="setLogo(this.files[0])"></label>'+(b.logo_path?'<button class="sb" onclick="setLogo(null)">Remove logo</button>':'')+'<button class="sb" onclick="delBrand()">Delete brand</button></div>';
   h+=list.length?list.map(m=>'<div class="card row"><div class="fl" onclick="go(\'cases\',{m:'+m.id+'})"><b>'+esc(m.name)+'</b></div>'+(st?'<button class="sb" onclick="renameModel('+m.id+')">Edit</button><button class="sb" onclick="delModel('+m.id+')">Delete</button>':'')+'</div>').join(''):'<p class="mu">No models yet.</p>';
@@ -326,7 +350,7 @@ function caseCard(c,st){
 }
 async function cases(){
   const m=S.models.find(x=>x.id===V.m);if(!m){V={n:'home'};return home()}
-  const st=staff();let q=sb.from('cases').select(CC).eq('model_id',m.id).order('name');if(st)q=q.is('deleted_at',null);
+  const st=staff()&&!S.billing;let q=sb.from('cases').select(CC).eq('model_id',m.id).order('name');if(staff())q=q.is('deleted_at',null);
   const r=await q;if(r.error)throw r.error;V.rows=r.data;V.sel=V.sel||{};
   return head(m.name,st?'<button class="ib" onclick="go(\'edit\',{m:'+m.id+'})">+ Case</button>':cartBtn())+'<div class="pad">'+(r.data.length?r.data.map(c=>caseCard(c,st)).join(''):'<p class="mu">No cases yet.</p>')+'</div>';
 }
@@ -409,6 +433,7 @@ async function saveCase(){
 function cart(){
   let h=head('Cart')+'<div class="pad">';if(!S.cart.length)return h+'<p class="mu">Your cart is empty.</p></div>';
   let t=0;h+=S.cart.map((l,i)=>{t+=l.unit*l.qty;return '<div class="card"><b>'+esc(l.name)+'</b><div class="mu">'+esc(l.brand)+' \u00B7 '+esc(l.model)+'</div><div class="row2"><button class="sb" onclick="cq('+i+',-1)">\u2212</button><b>'+l.qty+'</b><button class="sb" onclick="cq('+i+',1)">+</button><span class="fl"></span>'+rs(l.unit*l.qty)+'<button class="sb" onclick="cr('+i+')">Remove</button></div></div>'}).join('');
+  if(S.billing)return h+'<div class="tot">Total: '+rs(t)+'</div><label>Customer name (optional)</label><input class="in" value="'+esc(S.cn||'')+'" oninput="S.cn=this.value"><label>Mobile number (optional)</label><input class="in" type="tel" inputmode="numeric" maxlength="10" value="'+esc(S.cp||'')+'" oninput="S.cp=this.value"><div class="row2"><button class="bt" onclick="counterSale(\'cash\')">Paid \u2013 Cash</button><button class="bt" onclick="counterSale(\'upi\')">Paid \u2013 GPay</button></div><p class="mu">Tap how the customer paid. The bill is saved in your name and the stock is reduced.</p></div>';
   return h+'<div class="tot">Total: '+rs(t)+'</div><label>Your name</label><input class="in" value="'+esc(S.cn||'')+'" oninput="S.cn=this.value" autocomplete="name"><label>Mobile number</label><input class="in" type="tel" inputmode="numeric" maxlength="10" value="'+esc(S.cp||'')+'" oninput="S.cp=this.value" autocomplete="tel"><button class="bt wide" onclick="checkout()">Generate bill</button><p class="mu">Pay at the counter by cash or GPay / UPI. Your order is confirmed after the shop approves it.</p></div>';
 }
 function cq(i,d){const l=S.cart[i];l.qty=Math.max(1,Math.min(l.max,l.qty+d));render()}
@@ -428,7 +453,7 @@ function qrSvg(t){try{const m=makeQr(t),n=m.length,q=4;let p='';for(let y=0;y<n;
 function receipt(){
   const b=V.b;
   const link=S.upi?'upi://pay?pa='+S.upi.replace(/\s/g,'')+'&pn='+encodeURIComponent(S.shop)+'&am='+b.total+'.00&cu=INR&tn='+encodeURIComponent('Bill '+b.no):'';
-  return head('Your bill')+'<div class="pad">'+billHtml(b)+'<p class="c"><b>Pay at the counter</b> by cash or GPay / UPI.</p>'+(link?'<div class="c">'+qrSvg(link)+'<p><a class="bt" href="'+esc(link)+'">Open UPI app</a></p></div>':'')+'<p class="mu">Show this bill at the counter. After the shop confirms your payment, collect your product.</p><div class="row2"><button class="bt" onclick="window.print()">Print bill</button><button class="bt alt" onclick="stack=[];V={n:\'home\'};render()">Done</button></div></div>';
+  return head('Your bill')+'<div class="pad">'+billHtml(b)+''+(b.pay?'<p class="c"><b>Paid by '+esc(b.pay)+'</b></p>':'<p class="c"><b>Pay at the counter</b> by cash or GPay / UPI.</p>')+(link&&!b.pay?'<div class="c">'+qrSvg(link)+'<p><a class="bt" href="'+esc(link)+'">Open UPI app</a></p></div>':'')+''+(b.pay?'':'<p class="mu">Show this bill at the counter. After the shop confirms your payment, collect your product.</p>')+'<div class="row2"><button class="bt" onclick="window.print()">Print bill</button><button class="bt alt" onclick="stack=[];V={n:\'home\'};render()">Done</button></div></div>';
 }
 /* ---------- staff: orders, settings, login ---------- */
 async function orders(){
@@ -437,7 +462,7 @@ async function orders(){
   return head('Orders')+'<div class="pad"><p class="mu">Check the payment (cash in hand, or GPay in your UPI app), then tap how the customer paid.</p>'+(d.length?d.map((o,ix)=>ordCard(o,ix,true)).join(''):'<p class="mu">No orders yet.</p>')+'</div>';
 }
 function ordCard(o,ix,act){
-  return '<div class="card"><div class="row2" style="margin:0"><b>'+esc(o.receipt_no)+'</b> \u00B7 '+rs(o.total)+'<span class="fl"></span><span class="tag '+esc(o.status)+'">'+esc(o.status)+'</span></div><div>'+esc(o.customer_name||'(no name)')+(o.customer_phone?' \u00B7 '+esc(o.customer_phone):'')+'</div><div class="mu">'+esc(new Date(o.created_at).toLocaleString())+(o.status==='approved'?' \u00B7 '+payName(o.method):'')+'</div>'+o.order_items.map(i=>'<div>'+i.qty+' \u00D7 '+esc(i.brand_name||'')+' '+esc(i.model_name||'')+' \u2013 '+esc(i.case_name)+' ('+rs(i.unit_price)+')</div>').join('')+'<div class="row2">'+(act&&o.status==='pending'?'<button class="bt" onclick="decide('+o.id+',\'approve_order\',\'cash\')">Approve \u2013 Cash</button><button class="bt" onclick="decide('+o.id+',\'approve_order\',\'upi\')">Approve \u2013 GPay</button><button class="bt bad2" onclick="decide('+o.id+',\'reject_order\')">Reject</button>':'')+'<button class="bt alt" onclick="showBill(billOf(V.ol['+ix+']))">Bill</button></div></div>';
+  return '<div class="card"><div class="row2" style="margin:0"><b>'+esc(o.receipt_no)+'</b> \u00B7 '+rs(o.total)+'<span class="fl"></span><span class="tag '+esc(o.status)+'">'+esc(o.status)+'</span></div><div>'+esc(o.customer_name||'(no name)')+(o.customer_phone?' \u00B7 '+esc(o.customer_phone):'')+'</div><div class="mu">'+esc(new Date(o.created_at).toLocaleString())+(o.status==='approved'?' \u00B7 '+payName(o.method)+(o.handled_by_email?' \u00B7 by '+esc(o.handled_by_email.split('@')[0]):''):'')+'</div>'+o.order_items.map(i=>'<div>'+i.qty+' \u00D7 '+esc(i.brand_name||'')+' '+esc(i.model_name||'')+' \u2013 '+esc(i.case_name)+' ('+rs(i.unit_price)+')</div>').join('')+'<div class="row2">'+(act&&o.status==='pending'?'<button class="bt" onclick="decide('+o.id+',\'approve_order\',\'cash\')">Approve \u2013 Cash</button><button class="bt" onclick="decide('+o.id+',\'approve_order\',\'upi\')">Approve \u2013 GPay</button><button class="bt bad2" onclick="decide('+o.id+',\'reject_order\')">Reject</button>':'')+'<button class="bt alt" onclick="showBill(billOf(V.ol['+ix+']))">Bill</button></div></div>';
 }
 async function decide(id,fn,method){if(S.busy)return;S.busy=1;const a={p_order_id:id};if(method)a.p_method=method;const r=await sb.rpc(fn,a);S.busy=0;if(r.error)alert(r.error.message);render()}
 /* ---------- bill ---------- */
@@ -453,33 +478,170 @@ function showBill(b){
   document.body.appendChild(o);
 }
 /* ---------- dashboard ---------- */
+/* ---------- founder dashboard ---------- */
+const DPAL=['#a855f7','#ec4899','#22d3ee','#f59e0b','#34d399','#94a3b8'];
+const m$=n=>rs(Math.round(n).toLocaleString('en-IN'));
+const sname=e=>e?String(e).split('@')[0]:'Not recorded';
+const thm=()=>{try{return localStorage.getItem('dthm')||'1'}catch(e){return '1'}};
+function setThm(n){try{localStorage.setItem('dthm',n)}catch(e){}render()}
+function dSet(k){V.p=k;V.rk=null;render()}
+function dGo(){V.from=$('df').value;V.to=$('dt').value||$('df').value;if(!V.from)return alert('Pick the start date');V.p='c';V.rk=null;render()}
+function dTab(t,sub){V.tab=t;if(sub)V.ps=sub;render();window.scrollTo(0,0)}
+function tg(k,v){V[k]=v;render()}
+function tgl(k,cur,opts){return '<span class="tgl">'+opts.map(o=>'<button class="'+(cur===o[0]?'on':'')+'" onclick="tg(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join('')+'</span>'}
+function dRange(){
+  const p=V.p||'7';let a=new Date(),b=null;a.setHours(0,0,0,0);
+  if(p==='a')return [null,null];
+  if(p==='7')a.setDate(a.getDate()-6);
+  else if(p==='30')a.setDate(a.getDate()-29);
+  else if(p==='c'){const x=new Date((V.from||'')+'T00:00:00'),y=new Date((V.to||V.from||'')+'T23:59:59');if(!isNaN(x)&&!isNaN(y)){a=x;b=y}}
+  return [a.toISOString(),b?b.toISOString():null];
+}
+function crunch(rep,cs,a,b){
+  const D={rev:0,prof:0,cash:0,upi:0,bills:rep.orders.length,sold:0,noCost:0,revC:0,pr:{},st:{},dy:{},orders:rep.orders,en:b};
+  D.st0=a||(rep.orders.length?rep.orders[rep.orders.length-1].decided_at:new Date().toISOString());
+  D.mon=((b?new Date(b):new Date())-new Date(D.st0))/864e5>62;
+  const gk=d=>{const x=new Date(d).toLocaleDateString('en-CA');return D.mon?x.slice(0,7):x};
+  rep.orders.forEach(o=>{
+    D.rev+=o.total;if(o.method==='cash')D.cash+=o.total;else if(o.method==='upi')D.upi+=o.total;
+    const sk=sname(o.handled_by_email);
+    const s=D.st[sk]||(D.st[sk]={n:sk,bills:0,rev:0,prof:0,cash:0,upi:0});
+    s.bills++;s.rev+=o.total;if(o.method==='cash')s.cash+=o.total;else if(o.method==='upi')s.upi+=o.total;
+    const k=gk(o.decided_at),d=D.dy[k]||(D.dy[k]={k:k,rev:0,prof:0});d.rev+=o.total;
+    o.order_items.forEach(i=>{
+      D.sold+=i.qty;const id=i.case_id||('x'+i.case_name);
+      const p=D.pr[id]||(D.pr[id]={id:i.case_id,n:i.case_name,m:i.model_name,qty:0,rev:0,prof:0});
+      p.qty+=i.qty;p.rev+=i.unit_price*i.qty;
+      if(i.cost_price==null)D.noCost+=i.qty;
+      else{const g=(i.unit_price-i.cost_price)*i.qty;p.prof+=g;D.prof+=g;s.prof+=g;d.prof+=g;D.revC+=i.unit_price*i.qty}
+    });
+  });
+  const cost={};rep.costs.forEach(x=>{cost[x.case_id]=x.cost_price});
+  D.cases=cs;
+  D.stockCost=cs.reduce((t,x)=>t+(cost[x.id]==null?0:x.qty*cost[x.id]),0);
+  D.stockSell=cs.reduce((t,x)=>t+x.qty*(x.offer_price!=null?x.offer_price:(x.price||0)),0);
+  return D;
+}
+function series(D){
+  const out=[],s=new Date(D.st0),e=D.en?new Date(D.en):new Date();
+  if(D.mon){s.setDate(1);while(s<=e&&out.length<60){const k=s.toLocaleDateString('en-CA').slice(0,7);out.push(D.dy[k]||{k:k,rev:0,prof:0});s.setMonth(s.getMonth()+1)}}
+  else{s.setHours(0,0,0,0);while(s<=e&&out.length<70){const k=s.toLocaleDateString('en-CA');out.push(D.dy[k]||{k:k,rev:0,prof:0});s.setDate(s.getDate()+1)}}
+  return out;
+}
+function mkParts(list,vk,nk,fmt){
+  const a=list.filter(x=>x[vk]>0).sort((p,q)=>q[vk]-p[vk]),top=a.slice(0,5),rest=a.slice(5).reduce((t,x)=>t+x[vk],0);
+  const r=top.map((x,i)=>({n:x[nk],v:x[vk],c:DPAL[i],l:fmt(x[vk])}));
+  if(rest>0)r.push({n:'Others',v:rest,c:DPAL[5],l:fmt(rest)});
+  return r;
+}
+function donutH(parts){
+  const t=parts.reduce((x,y)=>x+y.v,0);if(!t)return '<p class="dmu">No sales in this period.</p>';
+  let off=0;
+  const arcs=parts.map(x=>{const pc=x.v*100/t,s='<circle r="15.9155" cx="21" cy="21" fill="none" stroke="'+x.c+'" stroke-width="6" stroke-dasharray="'+pc.toFixed(2)+' '+(100-pc).toFixed(2)+'" stroke-dashoffset="'+(25-off).toFixed(2)+'"/>';off+=pc;return s}).join('');
+  return '<div class="dn"><svg viewBox="0 0 42 42" width="140" height="140">'+arcs+'</svg><div class="lgd">'+parts.map(x=>'<div><i style="background:'+x.c+'"></i>'+esc(x.n)+' <b>'+Math.round(x.v*100/t)+'%</b></div>').join('')+'</div></div>';
+}
+function barsH(parts){
+  if(!parts.length)return '<p class="dmu">No sales in this period.</p>';
+  const t=Math.max.apply(null,parts.map(x=>x.v).concat([1]));
+  return parts.map(x=>'<div class="bh2"><span>'+esc(x.n)+'</span><div><u style="width:'+Math.round(x.v*100/t)+'%;background:'+x.c+'"></u></div><b>'+x.l+'</b></div>').join('');
+}
+function lineH(sr){
+  if(!sr.length)return '<p class="dmu">No data.</p>';
+  const W=300,H=110,n=sr.length,mx=Math.max.apply(null,sr.map(x=>Math.max(x.rev,x.prof)).concat([1]));
+  const pt=(v,i)=>(n>1?i*(W-10)/(n-1)+5:W/2).toFixed(1)+','+(H-8-v*(H-20)/mx).toFixed(1);
+  const pl=(k,c)=>'<polyline fill="none" stroke="'+c+'" stroke-width="2" stroke-linejoin="round" points="'+sr.map((x,i)=>pt(x[k],i)).join(' ')+'"/>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%">'+pl('rev','var(--dac)')+pl('prof','var(--dac2)')+'</svg>'+trendFoot(sr);
+}
+function colH(sr){
+  if(!sr.length)return '<p class="dmu">No data.</p>';
+  const mx=Math.max.apply(null,sr.map(x=>x.rev).concat([1]));
+  return '<div class="cols">'+sr.map(x=>'<div class="col"><u style="height:'+Math.round(x.rev*100/mx)+'%"></u></div>').join('')+'</div>'+trendFoot(sr);
+}
+function trendFoot(sr){return '<div class="dbt dmu"><span>'+esc(sr[0].k)+'</span><span style="color:var(--dac)">\u25CF Sales</span><span style="color:var(--dac2)">\u25CF Profit</span><span>'+esc(sr[sr.length-1].k)+'</span></div>'}
+const drw=(a,b,c)=>'<div class="drw"><span>'+esc(a)+(b?'<small>'+esc(b)+'</small>':'')+'</span><b>'+c+'</b></div>';
+const mnm=id=>(S.models.find(m=>m.id===id)||{}).name||'';
+function dChips(){
+  const c=(k,t)=>'<button class="dch'+(V.p===k?' on':'')+'" onclick="dSet(\''+k+'\')">'+t+'</button>';
+  return '<div class="dchs">'+c('t','Today')+c('7','7 days')+c('30','30 days')+c('a','All')+c('c','Pick dates')+'</div>'+(V.p==='c'?'<div class="dr"><input type="date" id="df" value="'+esc(V.from||'')+'"><input type="date" id="dt" value="'+esc(V.to||'')+'"><button class="dch on" onclick="dGo()">Search</button></div>':'');
+}
+function chartTrend(D){
+  const v=V.c1||'a',sr=series(D);
+  return '<div class="dbx"><div class="dbt"><b>Sales trend</b>'+tgl('c1',v,[['a','Line'],['b','Bars']])+'</div>'+(v==='a'?lineH(sr):colH(sr))+'</div>';
+}
+function chartShare(D){
+  const w=V.sh||'p',v=V.c2||'a';
+  const parts=w==='p'?mkParts(Object.values(D.pr),'qty','n',x=>x+' pcs'):mkParts(Object.values(D.st),'rev','n',m$);
+  return '<div class="dbx"><div class="dbt"><b>Share</b>'+tgl('c2',v,[['a','Donut'],['b','Bars']])+'</div><div style="margin-bottom:8px">'+tgl('sh',w,[['p','Products'],['s','Staff']])+'</div>'+(v==='a'?donutH(parts):barsH(parts))+'</div>';
+}
+function dOv(D){
+  const mg=D.revC?Math.round(D.prof*100/D.revC)+'%':'-';
+  const kp=(t,v,s)=>'<div class="dk"><div class="dmu">'+t+'</div><div class="dv">'+v+'</div>'+(s?'<div class="dmu">'+s+'</div>':'')+'</div>';
+  const pl=Object.values(D.pr),fast=pl.slice().sort((a,b)=>b.qty-a.qty),best=pl.filter(x=>x.prof>0).sort((a,b)=>b.prof-a.prof);
+  const stuck=D.cases.filter(x=>x.qty>0&&!D.pr[x.id]).sort((a,b)=>b.qty-a.qty),stf=Object.values(D.st).sort((a,b)=>b.rev-a.rev),low=D.cases.filter(x=>x.qty<=2);
+  const bx=(t,body,tab,sub)=>'<div class="dbx" onclick="dTab(\''+tab+'\''+(sub?',\''+sub+'\'':'')+')"><div class="dbt"><b>'+t+'</b><span class="dmu">View all \u203A</span></div>'+body+'</div>';
+  const t3=(a,f)=>a.length?a.slice(0,3).map(f).join(''):'<div class="dmu">Nothing yet</div>';
+  return '<div class="dks">'+kp('Total sales',m$(D.rev),D.bills+' bills')+kp('Profit',m$(D.prof),'margin '+mg)+kp('Cash',m$(D.cash))+kp('GPay / UPI',m$(D.upi))+'</div>'
+   +(D.noCost?'<p class="dmu">'+D.noCost+' sold cases have no cost price, so their profit is not counted.</p>':'')
+   +bx('Fast selling',t3(fast,x=>drw(x.n,x.m,x.qty+' sold')),'prod','fast')
+   +bx('Most profit',t3(best,x=>drw(x.n,x.m,m$(x.prof))),'prod','profit')
+   +bx('Not selling',t3(stuck,x=>drw(x.name,mnm(x.model_id),x.qty+' in stock')),'prod','none')
+   +bx('Staff performance',t3(stf,x=>drw(x.n,x.bills+' bills',m$(x.rev))),'staff')
+   +bx('Stock',drw('Low or out of stock',null,low.length)+drw('Stock value (cost)',null,m$(D.stockCost)),'stock')
+   +chartTrend(D)+chartShare(D);
+}
+function dSales(D){
+  const v=V.c3||'a';
+  const parts=[{n:'Cash',v:D.cash,c:DPAL[0],l:m$(D.cash)},{n:'GPay / UPI',v:D.upi,c:DPAL[1],l:m$(D.upi)}].filter(x=>x.v>0);
+  const sr=series(D).filter(x=>x.rev>0).reverse();
+  return '<div class="dbx"><div class="dbt"><b>Cash vs GPay</b>'+tgl('c3',v,[['a','Donut'],['b','Bars']])+'</div>'+(v==='a'?donutH(parts):barsH(parts))+'</div>'
+   +chartTrend(D)
+   +'<div class="dbx"><div class="dbt"><b>Day by day</b></div>'+(sr.length?sr.map(x=>drw(x.k,'profit '+m$(x.prof),m$(x.rev))).join(''):'<div class="dmu">No sales in this period.</div>')+'</div>'
+   +'<div class="dbx"><div class="dbt"><b>Recent bills</b></div>'+(D.orders.length?D.orders.slice(0,30).map(o=>drw(o.receipt_no+' \u00B7 '+(o.customer_name||''),(o.method==='upi'?'GPay':'Cash')+' \u00B7 '+sname(o.handled_by_email)+' \u00B7 '+new Date(o.decided_at).toLocaleDateString(),m$(o.total))).join(''):'<div class="dmu">No bills yet.</div>')+'</div>';
+}
+function dProd(D){
+  const s=V.ps||'fast',pl=Object.values(D.pr);
+  const chip=(k,t)=>'<button class="dch'+(s===k?' on':'')+'" onclick="tg(\'ps\',\''+k+'\')">'+t+'</button>';
+  let rows;
+  if(s==='none')rows=D.cases.filter(x=>x.qty>0&&!D.pr[x.id]).sort((a,b)=>b.qty-a.qty).map(x=>drw(x.name,mnm(x.model_id),x.qty+' in stock'));
+  else rows=pl.sort((a,b)=>s==='profit'?b.prof-a.prof:b.qty-a.qty).map(x=>drw(x.n,x.m+' \u00B7 '+m$(x.rev)+' sales',x.qty+' sold \u00B7 '+m$(x.prof)));
+  return '<div class="dchs">'+chip('fast','Fast selling')+chip('profit','Most profit')+chip('none','Not selling')+'</div><div class="dbx">'+(rows.length?rows.join(''):'<div class="dmu">Nothing yet.</div>')+'</div>';
+}
+function dStaff(D){
+  const L=Object.values(D.st).sort((a,b)=>b.rev-a.rev),v=V.c2||'a';
+  const parts=mkParts(L,'rev','n',m$);
+  return '<div class="dbx"><div class="dbt"><b>Staff share</b>'+tgl('c2',v,[['a','Donut'],['b','Bars']])+'</div>'+(v==='a'?donutH(parts):barsH(parts))+'</div>'
+   +L.map(x=>'<div class="dbx"><div class="dbt"><b>'+esc(x.n)+'</b><span class="dv" style="font-size:18px">'+m$(x.rev)+'</span></div>'+drw('Bills',null,x.bills)+drw('Profit',null,m$(x.prof))+drw('Cash',null,m$(x.cash))+drw('GPay / UPI',null,m$(x.upi))+'</div>').join('')
+   +(L.length?'':'<div class="dbx dmu">No sales in this period.</div>');
+}
+function dStock(D){
+  const all=D.cases.slice().sort((a,b)=>a.qty-b.qty),units=all.reduce((t,x)=>t+x.qty,0);
+  return '<div class="dks"><div class="dk"><div class="dmu">Units in stock</div><div class="dv">'+units+'</div></div><div class="dk"><div class="dmu">Out of stock</div><div class="dv">'+all.filter(x=>x.qty<=0).length+'</div></div><div class="dk"><div class="dmu">Value at cost</div><div class="dv">'+m$(D.stockCost)+'</div></div><div class="dk"><div class="dmu">Value at selling price</div><div class="dv">'+m$(D.stockSell)+'</div></div></div>'
+   +'<div class="dbx"><div class="dbt"><b>All cases (lowest stock first)</b></div>'+(all.length?all.map(x=>drw(x.name,mnm(x.model_id),x.qty<=0?'Out':x.qty+' pcs')).join(''):'<div class="dmu">No cases yet.</div>')+'</div>';
+}
 async function dash(){
   if(!fnd())return head('Dashboard')+'<div class="pad"><p class="mu">Only the founder ID can open the dashboard.</p></div>';
-  const p=V.p||'7';let since=null;
-  if(p!=='all'){const d=new Date();if(p==='t')d.setHours(0,0,0,0);else d.setTime(d.getTime()-Number(p)*864e5);since=d.toISOString()}
-  const [rp,c,pen]=await Promise.all([sb.rpc('founder_report',{p_since:since}),sb.from('cases').select('id,name,qty,model_id').is('deleted_at',null),sb.from('orders').select('id',{count:'exact',head:true}).eq('status','pending')]);
-  if(rp.error)throw rp.error;if(c.error)throw c.error;
-  const cost={};rp.data.costs.forEach(x=>{cost[x.case_id]=x.cost_price});const ord=rp.data.orders;
-  let rev=0,prof=0,sold=0,noCost=0,revC=0;const by={};
-  ord.forEach(o=>{rev+=o.total;o.order_items.forEach(i=>{sold+=i.qty;const k=i.case_id||('x'+i.case_name);const b=by[k]||(by[k]={id:i.case_id,name:i.case_name,model:i.model_name,qty:0,rev:0,prof:0});b.qty+=i.qty;b.rev+=i.unit_price*i.qty;if(i.cost_price==null)noCost+=i.qty;else{const g=(i.unit_price-i.cost_price)*i.qty;b.prof+=g;prof+=g;revC+=i.unit_price*i.qty}})});
-  const list=Object.values(by);
-  const fast=list.slice().sort((a,b)=>b.qty-a.qty).slice(0,10);
-  const best=list.slice().sort((a,b)=>b.prof-a.prof).slice(0,5);
-  const mn=id=>(S.models.find(m=>m.id===id)||{}).name||'';
-  const stuck=c.data.filter(x=>x.qty>0&&!by[x.id]).sort((a,b)=>b.qty-a.qty).slice(0,10);
-  const low=c.data.filter(x=>x.qty<=2).sort((a,b)=>a.qty-b.qty).slice(0,10);
-  const stockCost=c.data.reduce((a,x)=>a+(cost[x.id]==null?0:x.qty*cost[x.id]),0);
-  const pb=(k,t)=>'<button class="sb'+(p===k?' on':'')+'" onclick="V.p=\''+k+'\';render()">'+t+'</button>';
-  const li=a=>a.length?a.join(''):'<p class="mu">Nothing yet.</p>';
-  const sc=b=>'<div class="card"><b>'+esc(b.name)+'</b><div class="mu">'+esc(b.model||'')+'</div><div>'+b.qty+' sold \u00B7 '+rs(b.rev)+' \u00B7 profit '+rs(b.prof)+'</div></div>';
-  return head('Dashboard')+'<div class="pad"><div class="row2">'+pb('t','Today')+pb('7','7 days')+pb('30','30 days')+pb('all','All')+'</div>'
-   +'<div class="card"><div class="row2"><div class="fl">Sales<div class="tot">'+rs(rev)+'</div></div><div class="fl">Profit<div class="tot">'+rs(prof)+'</div></div></div><div class="mu">'+ord.length+' bills \u00B7 '+sold+' cases sold'+(revC?' \u00B7 margin '+Math.round(prof*100/revC)+'%':'')+'</div>'+(noCost?'<div class="mu">'+noCost+' sold cases have no cost price, so their profit is not counted. Add the cost price in Edit case.</div>':'')+'</div>'
-   +(pen.count?'<div class="card" onclick="go(\'orders\')"><b>'+pen.count+' pending order(s)</b><div class="mu">Tap to open Orders</div></div>':'')
-   +'<h3>Fast moving cases</h3>'+li(fast.map(sc))
-   +'<h3>Most profit</h3>'+li(best.map(sc))
-   +'<h3>In stock but not selling</h3>'+li(stuck.map(x=>'<div class="card"><b>'+esc(x.name)+'</b><div class="mu">'+esc(mn(x.model_id))+' \u00B7 '+x.qty+' in stock</div></div>'))
-   +'<h3>Reorder soon (2 or less)</h3>'+li(low.map(x=>'<div class="card"><b>'+esc(x.name)+'</b><div class="mu">'+esc(mn(x.model_id))+' \u00B7 '+(x.qty?x.qty+' left':'Out of stock')+'</div></div>'))
-   +'<div class="card mu">Stock value at cost price: '+rs(stockCost)+'</div></div>';
+  V.tab=V.tab||'ov';V.p=V.p||'7';
+  const r=dRange(),key=r[0]+'|'+r[1];
+  if(V.rk!==key||!V.rep){
+    const q=await Promise.all([sb.rpc('founder_report',{p_since:r[0],p_until:r[1]}),sb.from('cases').select('id,name,qty,model_id,price,offer_price').is('deleted_at',null)]);
+    if(q[0].error)throw q[0].error;if(q[1].error)throw q[1].error;
+    V.rep=crunch(q[0].data,q[1].data,r[0],r[1]);V.rk=key;
+  }
+  const D=V.rep,t=V.tab,names={ov:'Dashboard',sales:'Sales',prod:'Products',staff:'Staff',stock:'Stock'};
+  const body=t==='sales'?dSales(D):t==='prod'?dProd(D):t==='staff'?dStaff(D):t==='stock'?dStock(D):dOv(D);
+  return '<div class="dbw th'+thm()+'">'+head(names[t]||'Dashboard')+'<div class="dpad">'+dChips()+body+'<div class="dthm"><span class="dmu">Design</span>'+['1','2','3'].map(n=>'<button class="dch'+(thm()===n?' on':'')+'" onclick="setThm(\''+n+'\')">'+n+'</button>').join('')+'<button class="dch" onclick="V.rk=null;render()">Refresh</button></div></div></div>';
+}
+/* ---------- counter billing (staff) ---------- */
+async function counterSale(method){
+  if(S.busy)return;
+  const name=(S.cn||'').trim(),phone=(S.cp||'').replace(/\D/g,'');
+  if(phone&&phone.length!==10)return alert('Mobile number must be 10 digits');
+  S.busy=1;const lines=S.cart.slice();
+  const r=await sb.rpc('counter_sale',{p_items:lines.map(l=>({case_id:l.id,qty:l.qty})),p_name:name,p_phone:phone,p_method:method});S.busy=0;
+  if(r.error)return alert(r.error.message);
+  S.cart=[];S.cn='';S.cp='';stack=[];
+  V={n:'receipt',b:{no:r.data.receipt_no,date:new Date().toISOString(),name:name||'Walk-in customer',phone:phone,total:r.data.total,pay:payName(method),items:lines.map(l=>({name:l.name,brand:l.brand,model:l.model,qty:l.qty,unit:l.unit}))}};
+  try{await base()}catch(e){}render();
 }
 /* ---------- customer history ---------- */
 function hist(){return head('Customer history')+'<div class="pad"><label>Customer mobile number</label><input class="in" id="hp" type="tel" inputmode="numeric" placeholder="10 digit number" value="'+esc(V.hp||'')+'"><button class="bt wide" onclick="histGo()">Search</button><div id="hr">'+(V.hr||'')+'</div></div>'}
