@@ -46,6 +46,7 @@ label{font-size:14px;color:var(--mu)}
 .bh2{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.bh2 span{width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bh2 div{flex:1;background:var(--dbd);border-radius:6px;height:10px}.bh2 u{display:block;height:10px;border-radius:6px}
 .cols{display:flex;align-items:flex-end;gap:2px;height:110px}.col{flex:1;display:flex;align-items:flex-end;height:100%}.col u{display:block;width:100%;background:var(--dac);border-radius:3px 3px 0 0;min-height:1px}
 .dthm{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dbw .card{background:var(--dcd);border:1px solid var(--dbd);color:var(--dtx)}.dbw .in{background:var(--dcd);color:var(--dtx);border-color:var(--dbd)}.dbw .mu{color:var(--dmu)}.pp{background:rgba(124,58,237,.12);border-radius:10px;padding:10px;margin:0 0 12px;font-size:14px}
 </style></head><body>
 <div id="app"><p class="pad mu">Loading...</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.78.0/dist/umd/supabase.js"></script>
@@ -239,10 +240,10 @@ const PAL=['#0f766e','#be185d','#7c2d12','#1d4ed8','#4d7c0f','#6d28d9','#b45309'
 let S={brands:[],models:[],shop:'Mobile Shop',upi:'',cart:[],user:null,busy:0,pend:0};
 let V={n:'home'},stack=[];
 const MODE=()=>{const p=location.pathname.replace(/\/+$/,'').toLowerCase(),h=location.hash;return (p.slice(-8)==='/founder'||h==='#founder')?'founder':(p.slice(-6)==='/staff'||h==='#staff')?'staff':''};
-const staff=()=>!!S.user&&MODE()!=='';
+const staff=()=>!!S.user&&MODE()!==''&&!S.cview;
 const CC='id,model_id,name,qty,photo_path,price,offer_price,deleted_at,updated_at';
 const OI='id,order_id,case_id,case_name,model_name,brand_name,qty,unit_price,mrp';
-const fnd=()=>!!S.founder&&MODE()==='founder';
+const fnd=()=>!!S.founder&&staff();
 async function chkFounder(){S.founder=false;if(!S.user)return;try{const r=await sb.rpc('is_founder');S.founder=r.data===true}catch(e){}}
 function go(n,p){stack.push(V);V=Object.assign({n},p||{});render();window.scrollTo(0,0)}
 function back(){V=stack.pop()||{n:'home'};render()}
@@ -264,14 +265,13 @@ function zoom(src){const d=document.createElement('div');d.className='zm';d.oncl
 function head(title,right){return '<div class="hd">'+(V.n!=='home'&&V.n!=='dash'?'<button class="ib" onclick="back()">\u2039 Back</button>':'<button class="ib" onclick="menu()">\u2630</button>')+'<b class="t">'+esc(title)+'</b>'+(S.billing&&staff()?'<span class="tag approved">BILLING</span>':'')+(right||'')+'</div>'}
 function menu(){
   const st=staff();let items;
-  if(st){
+  if(S.cview&&S.user)items=[['Home','home'],['Cart','cart'],['Staff: leave customer view','back2']];
+  else if(st){
     items=[];
-    if(fnd()&&V.n==='dash')items.push(['Overview','dt:ov'],['Sales','dt:sales'],['Products','dt:prod'],['Staff','dt:staff'],['Stock','dt:stock'],['-','-']);
+    if(fnd()&&V.n==='dash')items.push(['Overview','dt:ov'],['Sales','dt:sales'],['Products','dt:prod'],['Staff','dt:staff'],['Stock','dt:stock'],['Customers','dt:cust'],['Staff accounts','dt:team'],['-','-']);
     items.push(['Stock and Home','home'],['New Bill','bill']);
-    if(fnd())items.push(['Dashboard','dash']);
-    items.push(['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Customers','hist'],['Bin','bin'],['Settings','settings']);
-    if(fnd())items.push(['Customer view','cust']);
-    items.push(['Sign out','out']);
+    if(fnd())items.push(['Dashboard','dash'],['Customers','dt:cust'],['Staff accounts','dt:team']);
+    items.push(['Orders'+(S.pend?' ('+S.pend+')':''),'orders'],['Bin','bin'],['Settings','settings'],['Customer view','cust'],['Sign out','out']);
   }else items=[['Home','home'],['Cart','cart']];
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999';
@@ -280,7 +280,8 @@ function menu(){
   o.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     const k=b.dataset.a;o.remove();
     if(k.indexOf('dt:')===0){const t=k.slice(3);if(V.n==='dash')V.tab=t;else{stack=[];V={n:'dash',tab:t}}render();window.scrollTo(0,0);return}
-    if(k==='cust'){S.billing=false;location.href='/';return}
+    if(k==='cust'){S.cview=true;S.billing=false;try{sessionStorage.setItem('cv','1')}catch(e){}stack=[];V={n:'home'};render();return}
+    if(k==='back2'){askPw();return}
     if(k==='out'){S.billing=false;logout();return}
     if(k==='bill'){S.billing=true;stack=[];V={n:'home'};render();return}
     S.billing=false;stack=[];V={n:'home'};
@@ -302,7 +303,7 @@ async function render(){
   try{
     if(MODE()!==''&&!S.user){a.innerHTML=loginView()}
     else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin,dash,hist}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
-    a.innerHTML+=(MODE()==='founder'?'<div class="ft"><a href="/">Customer view</a></div>':'');
+    a.innerHTML+=(S.cview&&S.user?'<div class="ft"><a href="#" onclick="askPw();return false">Staff: leave customer view</a></div>':'');
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
 }
@@ -351,7 +352,7 @@ function caseCard(c,st){
 }
 async function cases(){
   const m=S.models.find(x=>x.id===V.m);if(!m){V={n:'home'};return home()}
-  const st=staff()&&!S.billing;let q=sb.from('cases').select(CC).eq('model_id',m.id).order('name');if(staff())q=q.is('deleted_at',null);
+  const st=staff()&&!S.billing;let q=sb.from('cases').select(CC).eq('model_id',m.id).order('name');q=q.is('deleted_at',null);
   const r=await q;if(r.error)throw r.error;V.rows=r.data;V.sel=V.sel||{};
   return head(m.name,st?'<button class="ib" onclick="go(\'edit\',{m:'+m.id+'})">+ Case</button>':cartBtn())+'<div class="pad">'+(r.data.length?r.data.map(c=>caseCard(c,st)).join(''):'<p class="mu">No cases yet.</p>')+'</div>';
 }
@@ -410,11 +411,17 @@ async function purgeCase(id){
   render();
 }
 /* ---------- edit case ---------- */
+function prof(){
+  const g=i=>{const e=$(i);return e&&e.value!==''?Number(e.value):null},p=g('ep'),o=g('eo'),c=g('ec'),pp=$('pp');
+  if(!pp)return;const sell=o!=null?o:p;
+  if(c==null||sell==null){pp.textContent=c==null?'Enter the base price to see your profit.':'Enter the price to see your profit.';return}
+  const pr=sell-c;pp.innerHTML='Selling price '+rs(sell)+' \u2212 base '+rs(c)+' = <b>profit '+rs(pr)+' per piece</b> ('+(sell?Math.round(pr*100/sell):0)+'%)';pp.style.color=pr>=0?'':'#dc2626';
+}
 async function edit(){
   let c={name:'',qty:0,price:null,offer_price:null,photo_path:null};
   if(V.c){const r=await sb.from('cases').select(CC).eq('id',V.c).single();if(r.error)throw r.error;c=r.data}
   V.photo=c.photo_path;V.oldPhoto=c.photo_path;V.cost=null;if(V.c&&fnd()){const g=await sb.rpc('get_case_cost',{p_case_id:V.c});V.cost=g.data}
-  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" value="'+esc(c.price==null?'':c.price)+'">'+(fnd()?'<label>Cost price (your buying price - only the founder sees this)</label><input class="in" id="ec" type="number" min="0" inputmode="numeric" value="'+esc(V.cost==null?'':V.cost)+'">':'')+'<label>Offer price</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" value="'+esc(c.offer_price==null?'':c.offer_price)+'"><label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
+  return head(V.c?'Edit case':'New case')+'<div class="pad"><label>Name</label><input class="in" id="en" value="'+esc(c.name)+'"><label>Quantity</label><input class="in" id="eq" type="number" min="0" inputmode="numeric" value="'+esc(c.qty)+'"><label>Price (MRP)</label><input class="in" id="ep" type="number" min="0" inputmode="numeric" oninput="prof()" value="'+esc(c.price==null?'':c.price)+'"><label>Offer price (selling price)</label><input class="in" id="eo" type="number" min="0" inputmode="numeric" oninput="prof()" value="'+esc(c.offer_price==null?'':c.offer_price)+'">'+(fnd()?'<label>Base price (your purchase rate - only the founder sees this)</label><input class="in" id="ec" type="number" min="0" inputmode="numeric" oninput="prof()" value="'+esc(V.cost==null?'':V.cost)+'"><div id="pp" class="pp"></div><img alt="" style="display:none" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" onload="prof()">':'')+'<label>Photo</label><div id="pv">'+(c.photo_path?'<img class="ph" src="'+esc(pub(c.photo_path))+'">':'')+'</div><input type="file" accept="image/*" onchange="pickPhoto(this.files[0])"><button class="bt wide" onclick="saveCase()">Save</button></div>';
 }
 async function pickPhoto(f){if(!f)return;try{$('pv').innerHTML='<span class="mu">Uploading...</span>';V.photo=await upload(f,800,'c');$('pv').innerHTML='<img class="ph" src="'+esc(pub(V.photo))+'">'}catch(e){$('pv').innerHTML='';alert(e.message||e)}}
 async function saveCase(){
@@ -518,7 +525,7 @@ function crunch(rep,cs,a,b){
     });
   });
   const cost={};rep.costs.forEach(x=>{cost[x.case_id]=x.cost_price});
-  D.cases=cs;
+  D.cases=cs;D.cost=cost;
   D.stockCost=cs.reduce((t,x)=>t+(cost[x.id]==null?0:x.qty*cost[x.id]),0);
   D.stockSell=cs.reduce((t,x)=>t+x.qty*(x.offer_price!=null?x.offer_price:(x.price||0)),0);
   return D;
@@ -604,8 +611,9 @@ function dProd(D){
   const chip=(k,t)=>'<button class="dch'+(s===k?' on':'')+'" onclick="tg(\'ps\',\''+k+'\')">'+t+'</button>';
   let rows;
   if(s==='none')rows=D.cases.filter(x=>x.qty>0&&!D.pr[x.id]).sort((a,b)=>b.qty-a.qty).map(x=>drw(x.name,mnm(x.model_id),x.qty+' in stock'));
+  else if(s==='nocost')rows=D.cases.filter(x=>D.cost[x.id]==null).map(x=>'<div style="cursor:pointer" onclick="V.rk=null;go(\'edit\',{m:'+x.model_id+',c:'+x.id+'})">'+drw(x.name,mnm(x.model_id)+' \u00B7 tap to add the base price',x.qty+' pcs')+'</div>');
   else rows=pl.sort((a,b)=>s==='profit'?b.prof-a.prof:b.qty-a.qty).map(x=>drw(x.n,x.m+' \u00B7 '+m$(x.rev)+' sales',x.qty+' sold \u00B7 '+m$(x.prof)));
-  return '<div class="dchs">'+chip('fast','Fast selling')+chip('profit','Most profit')+chip('none','Not selling')+'</div><div class="dbx">'+(rows.length?rows.join(''):'<div class="dmu">Nothing yet.</div>')+'</div>';
+  return '<div class="dchs">'+chip('fast','Fast selling')+chip('profit','Most profit')+chip('none','Not selling')+chip('nocost','No base price')+'</div><div class="dbx">'+(rows.length?rows.join(''):'<div class="dmu">Nothing yet.</div>')+'</div>';
 }
 function dStaff(D){
   const L=Object.values(D.st).sort((a,b)=>b.rev-a.rev),v=V.c2||'a';
@@ -614,10 +622,14 @@ function dStaff(D){
    +L.map(x=>'<div class="dbx"><div class="dbt"><b>'+esc(x.n)+'</b><span class="dv" style="font-size:18px">'+m$(x.rev)+'</span></div>'+drw('Bills',null,x.bills)+drw('Profit',null,m$(x.prof))+drw('Cash',null,m$(x.cash))+drw('GPay / UPI',null,m$(x.upi))+'</div>').join('')
    +(L.length?'':'<div class="dbx dmu">No sales in this period.</div>');
 }
+function dCust(){return '<div class="dbx"><div class="dmu">Customer mobile number (4 digits or more)</div><input class="in" id="hp" type="tel" inputmode="numeric" placeholder="Mobile number" value="'+esc(V.hp||'')+'"><button class="bt wide" onclick="histGo()">Search</button></div><div id="hr">'+(V.hr||'')+'</div>'}
 function dStock(D){
   const all=D.cases.slice().sort((a,b)=>a.qty-b.qty),units=all.reduce((t,x)=>t+x.qty,0);
-  return '<div class="dks"><div class="dk"><div class="dmu">Units in stock</div><div class="dv">'+units+'</div></div><div class="dk"><div class="dmu">Out of stock</div><div class="dv">'+all.filter(x=>x.qty<=0).length+'</div></div><div class="dk"><div class="dmu">Value at cost</div><div class="dv">'+m$(D.stockCost)+'</div></div><div class="dk"><div class="dmu">Value at selling price</div><div class="dv">'+m$(D.stockSell)+'</div></div></div>'
-   +'<div class="dbx"><div class="dbt"><b>All cases (lowest stock first)</b></div>'+(all.length?all.map(x=>drw(x.name,mnm(x.model_id),x.qty<=0?'Out':x.qty+' pcs')).join(''):'<div class="dmu">No cases yet.</div>')+'</div>';
+  const sell=x=>x.offer_price!=null?x.offer_price:(x.price||0);
+  const pot=all.reduce((t,x)=>t+(D.cost[x.id]==null?0:x.qty*(sell(x)-D.cost[x.id])),0);
+  const row=x=>{const c=D.cost[x.id];return '<div style="cursor:pointer" onclick="V.rk=null;go(\'edit\',{m:'+x.model_id+',c:'+x.id+'})">'+drw(x.name,mnm(x.model_id)+' \u00B7 base '+(c==null?'not set':m$(c))+' \u00B7 sell '+m$(sell(x))+(c==null?'':' \u00B7 profit '+m$(sell(x)-c)+' per piece'),x.qty<=0?'Out':x.qty+' pcs')+'</div>'};
+  return '<div class="dks"><div class="dk"><div class="dmu">Units in stock</div><div class="dv">'+units+'</div></div><div class="dk"><div class="dmu">Out of stock</div><div class="dv">'+all.filter(x=>x.qty<=0).length+'</div></div><div class="dk"><div class="dmu">Value at base price</div><div class="dv">'+m$(D.stockCost)+'</div></div><div class="dk"><div class="dmu">Profit if all sold</div><div class="dv">'+m$(pot)+'</div></div></div>'
+   +'<div class="dbx"><div class="dbt"><b>All cases</b><span class="dmu">Tap a case to edit</span></div>'+(all.length?all.map(row).join(''):'<div class="dmu">No cases yet.</div>')+'</div>';
 }
 async function dash(){
   if(!fnd())return head('Dashboard')+'<div class="pad"><p class="mu">Only the founder ID can open the dashboard.</p></div>';
@@ -628,9 +640,46 @@ async function dash(){
     if(q[0].error)throw q[0].error;if(q[1].error)throw q[1].error;
     V.rep=crunch(q[0].data,q[1].data,r[0],r[1]);V.rk=key;
   }
-  const D=V.rep,t=V.tab,names={ov:'Dashboard',sales:'Sales',prod:'Products',staff:'Staff',stock:'Stock'};
-  const body=t==='sales'?dSales(D):t==='prod'?dProd(D):t==='staff'?dStaff(D):t==='stock'?dStock(D):dOv(D);
-  return '<div class="dbw th'+thm()+'">'+head(names[t]||'Dashboard')+'<div class="dpad">'+dChips()+body+'<div class="dthm"><span class="dmu">Design</span>'+['1','2','3'].map(n=>'<button class="dch'+(thm()===n?' on':'')+'" onclick="setThm(\''+n+'\')">'+n+'</button>').join('')+'<button class="dch" onclick="V.rk=null;render()">Refresh</button></div></div></div>';
+  const D=V.rep,t=V.tab,names={ov:'Dashboard',sales:'Sales',prod:'Products',staff:'Staff',stock:'Stock',cust:'Customers',team:'Staff accounts'};
+  const body=t==='team'?await dTeam():t==='sales'?dSales(D):t==='prod'?dProd(D):t==='staff'?dStaff(D):t==='stock'?dStock(D):t==='cust'?dCust():dOv(D);
+  return '<div class="dbw th'+thm()+'">'+head(names[t]||'Dashboard')+'<div class="dpad">'+(t==='cust'||t==='team'?'':dChips())+body+'<div class="dthm"><span class="dmu">Design</span>'+['1','2','3'].map(n=>'<button class="dch'+(thm()===n?' on':'')+'" onclick="setThm(\''+n+'\')">'+n+'</button>').join('')+'<button class="dch" onclick="V.rk=null;render()">Refresh</button></div></div></div>';
+}
+/* ---------- staff accounts (founder adds or removes logins) ---------- */
+async function fnCall(body){
+  const r=await sb.functions.invoke('staff-admin',{body:body});
+  if(r.error){let m=r.error.message;try{const j=await r.error.context.json();if(j&&j.error)m=j.error}catch(e){}throw new Error(m)}
+  if(r.data&&r.data.error)throw new Error(r.data.error);
+  return r.data;
+}
+async function dTeam(){
+  let d;
+  try{d=await fnCall({action:'list'})}
+  catch(e){return '<div class="dbx"><div class="dbt"><b>Staff accounts</b></div><p class="dmu">Could not load: '+esc(e.message)+'</p><p class="dmu">The staff-admin function must be deployed in Supabase first.</p></div>'}
+  const rows=d.users.map(u=>'<div class="drw"><span>'+esc(u.name||sname(u.email))+'<small>'+esc(u.email)+(u.founder?' \u00B7 Founder':'')+'</small></span>'+(u.founder?'':'<button class="dch" onclick="delStaff(\''+esc(u.id)+'\')">Remove</button>')+'</div>').join('');
+  return '<div class="dbx"><div class="dbt"><b>Add a staff person</b></div><input class="in" id="tn" placeholder="Name"><input class="in" id="te" type="email" placeholder="Email (this is their login)" autocapitalize="off" autocorrect="off"><input class="in" id="tp" type="text" placeholder="Password (8 or more characters)" autocapitalize="off" autocorrect="off"><button class="bt wide" onclick="addStaff()">Add staff</button><p class="dmu">Give them the email and password. They sign in from the staff link.</p></div><div class="dbx"><div class="dbt"><b>All logins</b></div>'+rows+'</div>';
+}
+async function addStaff(){
+  const name=$('tn').value.trim(),email=$('te').value.trim(),password=$('tp').value;
+  if(!email)return alert('Enter the email');
+  if(password.length<8)return alert('Password must be 8 or more characters');
+  try{await fnCall({action:'create',email:email,password:password,name:name});alert('Staff person added');render()}catch(e){alert(e.message)}
+}
+async function delStaff(id){
+  if(!(await ask('Remove this login? They will not be able to sign in again.')))return;
+  try{await fnCall({action:'delete',id:id});render()}catch(e){alert(e.message)}
+}
+function askPw(){
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML='<div style="background:var(--card,#fff);color:var(--tx,#111);border-radius:14px;padding:18px;max-width:360px;width:100%"><p style="margin:0 0 12px;font-size:17px">Staff only: enter your password to leave customer view</p><input class="in" id="xpw" type="password" style="margin:0 0 12px"><div style="display:flex;gap:10px;justify-content:flex-end"><button class="sb" id="xno">Cancel</button><button class="bt" id="xok">OK</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('#xno').onclick=()=>o.remove();
+  o.querySelector('#xok').onclick=async()=>{
+    const r=await sb.auth.signInWithPassword({email:S.user.email,password:o.querySelector('#xpw').value});
+    if(r.error)return alert('Wrong password');
+    o.remove();S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}
+    stack=[];V=S.founder?{n:'dash'}:{n:'home'};render();
+  };
 }
 /* ---------- counter billing (staff) ---------- */
 async function counterSale(method){
@@ -659,11 +708,11 @@ async function histGo(){
 }
 function settings(){return head('Settings')+'<div class="pad"><label>Shop name</label><input class="in" id="sn" value="'+esc(S.shop)+'"><label>Shop UPI ID</label><input class="in" id="su" value="'+esc(S.upi)+'" placeholder="name@bank"><button class="bt wide" onclick="saveSet()">Save</button><button class="bt wide alt" onclick="logout()">Sign out</button></div>'}
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
-async function logout(){await sb.auth.signOut();S.user=null;S.founder=false;stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
+async function logout(){await sb.auth.signOut();S.user=null;S.founder=false;S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
 function loginView(){return head(MODE()==='founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
-async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();stack=[];V={n:'home'};if(MODE()==='founder'){if(S.founder)V={n:'dash'};else{alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null}}render()}
+async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();stack=[];V={n:'home'};if(MODE()==='founder'&&!S.founder){alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null;S.founder=false}else if(S.founder)V={n:'dash'};render()}
 (async()=>{
-  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;await chkFounder();if(MODE()==='founder'&&S.founder)V={n:'dash'};await base()}
+  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;try{S.cview=!!S.user&&sessionStorage.getItem('cv')==='1'}catch(e){}await chkFounder();if(MODE()!==''&&S.founder&&!S.cview)V={n:'dash'};await base()}
   catch(e){$('app').innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p></div>';return}
   render();
 })();
