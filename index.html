@@ -266,7 +266,7 @@ const MODE=()=>{const p=location.pathname.replace(/\/+$/,'').toLowerCase(),h=loc
 const staff=()=>!!S.user&&MODE()!==''&&!S.cview;
 const CC='id,model_id,name,qty,photo_path,price,offer_price,deleted_at,updated_at';
 const OI='id,order_id,case_id,case_name,model_name,brand_name,qty,unit_price,mrp';
-const fnd=()=>!!S.founder&&staff();
+const fnd=()=>!!S.founder&&staff()&&MODE()==='founder';
 async function chkFounder(){S.founder=false;if(!S.user)return;try{const r=await sb.rpc('is_founder');S.founder=r.data===true}catch(e){}}
 function go(n,p){stack.push(V);V=Object.assign({n},p||{});render();window.scrollTo(0,0)}
 function back(){V=stack.pop()||{n:'home'};render()}
@@ -683,22 +683,32 @@ async function fnCall(body){
   return r.data;
 }
 async function dTeam(){
-  let d;
-  try{d=await fnCall({action:'list'})}
-  catch(e){return '<div class="dbx"><div class="dbt"><b>Staff accounts</b></div><p class="dmu">Could not load: '+esc(e.message)+'</p><p class="dmu">The staff-admin function must be deployed in Supabase first.</p></div>'}
-  const rows=d.users.map(u=>'<div class="drw"><span>'+esc(u.name||staffId(u.email))+'<small>ID: '+esc(staffId(u.email))+(u.founder?' \u00B7 Founder':'')+'</small></span>'+(u.founder?'':'<button class="dch" onclick="delStaff(\''+esc(u.id)+'\')">Remove</button>')+'</div>').join('');
+  const r=await sb.rpc('staff_list');
+  if(r.error||!Array.isArray(r.data))return '<div class="dbx"><div class="dbt"><b>Staff accounts</b></div><p class="dmu">Could not load the staff list.</p><p class="dmu">'+esc(r.error?r.error.message:'Unexpected answer from the server')+'</p><p class="dmu">Run the staff accounts SQL in Supabase first.</p></div>';
+  const rows=r.data.map(u=>'<div class="drw"><span>'+esc(u.name||staffId(u.email))+'<small>ID: '+esc(staffId(u.email))+(u.founder?' \u00B7 Founder':'')+(u.last?' \u00B7 last login '+esc(new Date(u.last).toLocaleDateString()):' \u00B7 never logged in')+'</small></span>'+(u.founder?'':'<span><button class="dch" onclick="teamPw(\''+esc(u.id)+'\')">New password</button> <button class="dch" onclick="delStaff(\''+esc(u.id)+'\')">Remove</button></span>')+'</div>').join('');
   return '<div class="dbx"><div class="dbt"><b>Add a staff person</b></div><input class="in" id="tn" placeholder="Name"><input class="in" id="te" type="text" placeholder="Staff ID (example staff1)" autocapitalize="off" autocorrect="off"><input class="in" id="tp" type="text" placeholder="Password (8 or more characters)" autocapitalize="off" autocorrect="off"><button class="bt wide" onclick="addStaff()">Add staff</button><p class="dmu">Give them the Staff ID and password. They type the ID (no email needed) on the staff link.</p></div><div class="dbx"><div class="dbt"><b>All logins</b></div>'+rows+'</div>';
 }
 async function addStaff(){
   const name=$('tn').value.trim(),sid=($('te').value||'').trim().toLowerCase(),password=$('tp').value;
   if(!/^[a-z0-9._-]{3,20}$/.test(sid))return alert('Staff ID: 3 to 20 small letters or numbers, example staff1');
-  const email=staffEmail(sid);
-  if(password.length<8)return alert('Password must be 8 or more characters');
-  try{await fnCall({action:'create',email:email,password:password,name:name});alert('Staff ID '+sid+' added. Give them this ID and the password.');render()}catch(e){alert(e.message)}
+  if(!(password.length>=8))return alert('Password must be 8 or more characters');
+  const r=await sb.rpc('staff_create',{p_id:sid,p_name:name,p_password:password});
+  if(r.error)return alert(r.error.message);
+  alert('Staff ID '+sid+' added. Give them this ID and the password.');render();
+}
+async function teamPw(id){
+  const p=await ask('New password (8 or more characters)',true,'');
+  if(p===null)return;
+  if(!(p.length>=8))return alert('Password must be 8 or more characters');
+  const r=await sb.rpc('staff_set_password',{p_user:id,p_password:p});
+  if(r.error)return alert(r.error.message);
+  alert('Password changed');
 }
 async function delStaff(id){
   if(!(await ask('Remove this login? They will not be able to sign in again.')))return;
-  try{await fnCall({action:'delete',id:id});render()}catch(e){alert(e.message)}
+  const r=await sb.rpc('staff_remove',{p_user:id});
+  if(r.error)return alert(r.error.message);
+  render();
 }
 function askPw(){
   const o=document.createElement('div');
@@ -710,7 +720,7 @@ function askPw(){
     const r=await sb.auth.signInWithPassword({email:S.user.email,password:o.querySelector('#xpw').value});
     if(r.error)return alert('Wrong password');
     o.remove();S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}
-    stack=[];V=S.founder?{n:'dash'}:{n:'home'};render();
+    stack=[];V=fnd()?{n:'dash'}:{n:'home'};render();
   };
 }
 /* ---------- themes, toast, notifications ---------- */
@@ -858,9 +868,9 @@ function settings(){return head('Settings')+'<div class="pad"><label>Shop name</
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
 async function logout(){await sb.auth.signOut({scope:'local'});S.user=null;S.founder=false;S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
 function loginView(){return head(MODE()==='founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="text" placeholder="ID (example staff1)" autocomplete="username" autocapitalize="off" autocorrect="off"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
-async function login(){const r=await sb.auth.signInWithPassword({email:staffEmail($('le').value),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();startPoll();stack=[];V={n:'home'};if(MODE()==='founder'&&!S.founder){alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut({scope:'local'});S.user=null;S.founder=false}else if(S.founder)V={n:'dash'};render()}
+async function login(){const r=await sb.auth.signInWithPassword({email:staffEmail($('le').value),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();startPoll();stack=[];V={n:'home'};if(MODE()==='founder'&&!S.founder){alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut({scope:'local'});S.user=null;S.founder=false}else if(fnd())V={n:'dash'};render()}
 (async()=>{
-  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;try{S.cview=!!S.user&&sessionStorage.getItem('cv')==='1'}catch(e){}await chkFounder();if(MODE()!==''&&S.founder&&!S.cview)V={n:'dash'};if(location.hash==='#want')V={n:'want'};await base()}
+  try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;try{S.cview=!!S.user&&sessionStorage.getItem('cv')==='1'}catch(e){}await chkFounder();if(fnd())V={n:'dash'};if(location.hash==='#want')V={n:'want'};await base()}
   catch(e){$('app').innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p></div>';return}
   render();if(S.user)startPoll();
 })();
