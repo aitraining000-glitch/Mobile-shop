@@ -251,6 +251,7 @@ const SUPA_URL='https://oguoopzyopstfltpgepk.supabase.co';
 const SUPA_KEY='sb_publishable_SaS97oxJKGqZtUzhESvXuA_LhqZSe-a';
 const linkMode=()=>{const p=location.pathname.replace(/\/+$/,'').toLowerCase(),h=location.hash;return (p.slice(-8)==='/founder'||h==='#founder')?'founder':(p.slice(-6)==='/staff'||h==='#staff')?'staff':'customer'};
 const START_MODE=linkMode();
+const APP_VER='10-Nov-C staff-sql';
 const staffEmail=v=>{v=String(v||'').trim().toLowerCase();return v.indexOf('@')>=0?v:'mshop.staff+'+v+'@gmail.com'};
 const staffId=e=>{const m=String(e||'').match(/^mshop\.staff\+(.+)@gmail\.com$/i);return m?m[1]:String(e||'')};
 const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{storageKey:'sb-mshop-'+START_MODE}});
@@ -335,6 +336,7 @@ async function render(){
     if(MODE()!==''&&!S.user){a.innerHTML=loginView()}
     else{const f={home,models,cases,cart,receipt,edit,orders,settings,bin,dash,hist,want,fb,thanks,enq}[V.n];a.innerHTML=await f();if(V.n==='home')renderList()}
     a.innerHTML+=(S.cview&&S.user?'<div class="ft"><a href="#" onclick="askPw();return false">Staff: leave customer view</a></div>':'');
+    a.innerHTML+='<div style="opacity:.55;font-size:11px;text-align:center;padding:8px">Version '+APP_VER+'</div>';
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
 }
