@@ -249,7 +249,11 @@ function makeQr(text) {
 
 const SUPA_URL='https://oguoopzyopstfltpgepk.supabase.co';
 const SUPA_KEY='sb_publishable_SaS97oxJKGqZtUzhESvXuA_LhqZSe-a';
-const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
+const linkMode=()=>{const p=location.pathname.replace(/\/+$/,'').toLowerCase(),h=location.hash;return (p.slice(-8)==='/founder'||h==='#founder')?'founder':(p.slice(-6)==='/staff'||h==='#staff')?'staff':'customer'};
+const START_MODE=linkMode();
+const staffEmail=v=>{v=String(v||'').trim().toLowerCase();return v.indexOf('@')>=0?v:'mshop.staff+'+v+'@gmail.com'};
+const staffId=e=>{const m=String(e||'').match(/^mshop\.staff\+(.+)@gmail\.com$/i);return m?m[1]:String(e||'')};
+const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{storageKey:'sb-mshop-'+START_MODE}});
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rs=n=>'\u20B9'+n;
@@ -334,7 +338,7 @@ async function render(){
     if(V.n==='home')renderList();
   }catch(e){a.innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p><button class="bt" onclick="location.reload()">Reload</button></div>'}
 }
-window.addEventListener('hashchange',()=>{stack=[];V=location.hash==='#want'?{n:'want'}:{n:'home'};render()});
+window.addEventListener('hashchange',()=>{if(linkMode()!==START_MODE){location.reload();return}stack=[];V=location.hash==='#want'?{n:'want'}:{n:'home'};render()});
 /* ---------- home ---------- */
 async function home(){
   const st=staff();
@@ -516,7 +520,7 @@ function showBill(b){
 /* ---------- founder dashboard ---------- */
 const DPAL=['#a855f7','#ec4899','#22d3ee','#f59e0b','#34d399','#94a3b8'];
 const m$=n=>rs(Math.round(n).toLocaleString('en-IN'));
-const sname=e=>e?String(e).split('@')[0]:'Not recorded';
+const sname=e=>e?(/^mshop\.staff\+/i.test(String(e))?staffId(e):String(e).split('@')[0]):'Not recorded';
 const thm=()=>{try{return localStorage.getItem('dthm')||'1'}catch(e){return '1'}};
 function setThm(n){try{localStorage.setItem('dthm',n)}catch(e){}render()}
 function dSet(k){V.p=k;V.rk=null;render()}
@@ -682,14 +686,15 @@ async function dTeam(){
   let d;
   try{d=await fnCall({action:'list'})}
   catch(e){return '<div class="dbx"><div class="dbt"><b>Staff accounts</b></div><p class="dmu">Could not load: '+esc(e.message)+'</p><p class="dmu">The staff-admin function must be deployed in Supabase first.</p></div>'}
-  const rows=d.users.map(u=>'<div class="drw"><span>'+esc(u.name||sname(u.email))+'<small>'+esc(u.email)+(u.founder?' \u00B7 Founder':'')+'</small></span>'+(u.founder?'':'<button class="dch" onclick="delStaff(\''+esc(u.id)+'\')">Remove</button>')+'</div>').join('');
-  return '<div class="dbx"><div class="dbt"><b>Add a staff person</b></div><input class="in" id="tn" placeholder="Name"><input class="in" id="te" type="email" placeholder="Email (this is their login)" autocapitalize="off" autocorrect="off"><input class="in" id="tp" type="text" placeholder="Password (8 or more characters)" autocapitalize="off" autocorrect="off"><button class="bt wide" onclick="addStaff()">Add staff</button><p class="dmu">Give them the email and password. They sign in from the staff link.</p></div><div class="dbx"><div class="dbt"><b>All logins</b></div>'+rows+'</div>';
+  const rows=d.users.map(u=>'<div class="drw"><span>'+esc(u.name||staffId(u.email))+'<small>ID: '+esc(staffId(u.email))+(u.founder?' \u00B7 Founder':'')+'</small></span>'+(u.founder?'':'<button class="dch" onclick="delStaff(\''+esc(u.id)+'\')">Remove</button>')+'</div>').join('');
+  return '<div class="dbx"><div class="dbt"><b>Add a staff person</b></div><input class="in" id="tn" placeholder="Name"><input class="in" id="te" type="text" placeholder="Staff ID (example staff1)" autocapitalize="off" autocorrect="off"><input class="in" id="tp" type="text" placeholder="Password (8 or more characters)" autocapitalize="off" autocorrect="off"><button class="bt wide" onclick="addStaff()">Add staff</button><p class="dmu">Give them the Staff ID and password. They type the ID (no email needed) on the staff link.</p></div><div class="dbx"><div class="dbt"><b>All logins</b></div>'+rows+'</div>';
 }
 async function addStaff(){
-  const name=$('tn').value.trim(),email=$('te').value.trim(),password=$('tp').value;
-  if(!email)return alert('Enter the email');
+  const name=$('tn').value.trim(),sid=($('te').value||'').trim().toLowerCase(),password=$('tp').value;
+  if(!/^[a-z0-9._-]{3,20}$/.test(sid))return alert('Staff ID: 3 to 20 small letters or numbers, example staff1');
+  const email=staffEmail(sid);
   if(password.length<8)return alert('Password must be 8 or more characters');
-  try{await fnCall({action:'create',email:email,password:password,name:name});alert('Staff person added');render()}catch(e){alert(e.message)}
+  try{await fnCall({action:'create',email:email,password:password,name:name});alert('Staff ID '+sid+' added. Give them this ID and the password.');render()}catch(e){alert(e.message)}
 }
 async function delStaff(id){
   if(!(await ask('Remove this login? They will not be able to sign in again.')))return;
@@ -851,9 +856,9 @@ async function histGo(){
 }
 function settings(){return head('Settings')+'<div class="pad"><label>Shop name</label><input class="in" id="sn" value="'+esc(S.shop)+'"><label>Shop UPI ID</label><input class="in" id="su" value="'+esc(S.upi)+'" placeholder="name@bank"><button class="bt wide" onclick="saveSet()">Save</button><button class="bt wide alt" onclick="logout()">Sign out</button></div>'}
 async function saveSet(){const n=$('sn').value.trim()||'Mobile Shop',u=$('su').value.trim();const r=await sb.from('settings').upsert([{key:'shop_name',value:n},{key:'upi_id',value:u}]);if(r.error)return alert(r.error.message);S.shop=n;S.upi=u;toast('Saved')}
-async function logout(){await sb.auth.signOut();S.user=null;S.founder=false;S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
-function loginView(){return head(MODE()==='founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="email" placeholder="Email" autocomplete="username"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
-async function login(){const r=await sb.auth.signInWithPassword({email:$('le').value.trim(),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();startPoll();stack=[];V={n:'home'};if(MODE()==='founder'&&!S.founder){alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut();S.user=null;S.founder=false}else if(S.founder)V={n:'dash'};render()}
+async function logout(){await sb.auth.signOut({scope:'local'});S.user=null;S.founder=false;S.cview=false;try{sessionStorage.removeItem('cv')}catch(e){}stack=[];V={n:'home'};if(location.hash)location.hash='';else render()}
+function loginView(){return head(MODE()==='founder'?'Founder login':'Staff login')+'<div class="pad"><input class="in" id="le" type="text" placeholder="ID (example staff1)" autocomplete="username" autocapitalize="off" autocorrect="off"><input class="in" id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="bt wide" onclick="login()">Sign in</button></div>'}
+async function login(){const r=await sb.auth.signInWithPassword({email:staffEmail($('le').value),password:$('lp').value});if(r.error)return alert(r.error.message);S.user=r.data.user;await chkFounder();startPoll();stack=[];V={n:'home'};if(MODE()==='founder'&&!S.founder){alert('This ID is not a founder ID. Staff can use the staff link.');await sb.auth.signOut({scope:'local'});S.user=null;S.founder=false}else if(S.founder)V={n:'dash'};render()}
 (async()=>{
   try{const s=await sb.auth.getSession();S.user=s.data.session?s.data.session.user:null;try{S.cview=!!S.user&&sessionStorage.getItem('cv')==='1'}catch(e){}await chkFounder();if(MODE()!==''&&S.founder&&!S.cview)V={n:'dash'};if(location.hash==='#want')V={n:'want'};await base()}
   catch(e){$('app').innerHTML='<div class="pad"><p class="err">'+esc(e.message||e)+'</p></div>';return}
